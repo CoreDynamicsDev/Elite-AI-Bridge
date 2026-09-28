@@ -1,0 +1,28 @@
+CC0 / Public-Domain Audio Research Notes
+Elite AI Bridge v0.12.62
+
+The v0.12.62 bundled WAV files are NOT copied from these sources. They are original procedural sounds generated specifically for Elite AI Bridge, with no third-party audio samples embedded.
+
+These CC0 libraries were researched as possible future replacement/source material:
+
+1. OpenGameArt - Retro Computer Noise (aquinn)
+   https://opengameart.org/content/retro-computer-noise
+   License listed by OpenGameArt: CC0
+   Description specifically references retro sci-fi computers with lights and spinning reels.
+
+2. OpenGameArt - UI Sounds (HaelDB)
+   https://opengameart.org/content/ui-sounds-0
+   License listed by OpenGameArt: CC0
+   Includes error, accept, notification and attention-style UI sounds.
+
+3. OpenGameArt - Interface Sounds (Kenney)
+   https://opengameart.org/content/interface-sounds
+   License listed by OpenGameArt: CC0
+   100 normalized interface/button/switch sounds.
+
+4. OpenGameArt - 60 CC0 Sci-Fi SFX (rubberduck)
+   https://opengameart.org/node/97882
+   License listed by OpenGameArt: CC0
+   Sci-fi / terminal / metal / ambient sounds.
+
+Reason they are not bundled in this build: the development environment could verify the source/license pages but could not reliably retrieve the binary ZIP/audio payloads. No external sound was included without actually obtaining and auditing the file.

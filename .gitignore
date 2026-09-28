@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Secrets / environment
+.env
+.env.*
+*.key
+*.pem
+secrets.*
+credentials.*
+*api_key*
+!docs/PRIVACY_AND_API_KEYS.md
+
+# Runtime/user data
+logs/
+support/
+diagnostics/
+*.log
+*.tmp
+*.bak
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Installer output
+installer/Output/
+Output/
+*.exe
+*.msi
+
+# Local build staging
+build/
+dist/
+release/
