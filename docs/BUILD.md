@@ -1,26 +1,40 @@
-ELITE AI BRIDGE 1.0.1 - CLEAN INSTALLER SOURCE
+# Elite AI Bridge 1.0.1 Build Instructions
 
-This source package contains the tested 1.0.1 build, including the Supertonic
-voice dependency, process cleanup, minimized source launcher, and CRT boot splash.
-Temporary splash-inspection files and Python bytecode caches are intentionally not
-included in this release source package.
+The public repository is organized so the complete readable application source
+lives under src/Elite AI Bridge/, while the Windows installer definition and
+build helper live under installer/.
 
-COMPILE ON WINDOWS
-1. Install Inno Setup 6 if it is not already installed.
-2. Extract this ZIP.
-3. Double-click BUILD_INSTALLER.bat.
-4. Finished installer: Output\Elite_AI_Bridge_Setup_1.0.1.exe
+## Local Windows build
 
-TEST BEFORE UPLOAD
-Install the generated EXE and verify that Elite AI Bridge launches and diagnostics
-report:
-- Selected voice engine: SUPERTONIC
-- Supertonic package available: True
-- Last backend used: Supertonic
+1. Install Inno Setup 6.
+2. Clone or extract this repository.
+3. Run installer\BUILD_INSTALLER.bat.
+4. The finished installer is written to:
+   installer\Output\Elite_AI_Bridge_Setup_1.0.1.exe
 
-Do not replace the public release until the generated installer has passed that test.
+The installer definition already points at the public src\Elite AI Bridge\
+payload. Do not copy the application into the installer directory.
 
-BOOT SPLASH
------------
-The 1.0.1 build includes the animated CRT boot splash. RUN_CURRENT_SOURCE.bat
-launches the same source path used by the installer runtime.
+## GitHub Actions build
+
+The repository also contains a Windows GitHub Actions build at
+.github/workflows/build-installer.yml.
+
+A push to main that changes application, installer, documentation, license, or
+workflow files builds the installer on a Windows runner. The workflow uploads
+the compiled installer and its SHA-256 checksum as an Actions artifact.
+
+## Release verification
+
+Before publishing a Windows installer release:
+
+- install the generated EXE on a clean Windows test machine;
+- verify the Bridge starts normally;
+- verify the private runtime setup completes;
+- verify Supertonic is available;
+- verify normal shutdown does not leave the Bridge backend running;
+- verify the CRT boot splash holds for at least 15 seconds;
+- verify the overlay behavior in Borderless/Windowed mode;
+- review the checksum before publishing.
+
+Compiled installers and build output do not belong in the source repository.
