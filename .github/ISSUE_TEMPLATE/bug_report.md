@@ -6,7 +6,6 @@ labels: bug
 ---
 
 **Bridge version**
-1.0.0
 
 **Windows version**
 

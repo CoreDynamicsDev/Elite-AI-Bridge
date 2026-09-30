@@ -1,5 +1,5 @@
 #define MyAppName "Elite AI Bridge"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Elite AI Bridge"
 #define MyAppURL "https://ko-fi.com/eliteaibridge"
 #define MyAppExeName "Launch_Elite_AI_Bridge.vbs"
@@ -19,7 +19,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=Output
-OutputBaseFilename=Elite_AI_Bridge_Setup_1.0
+OutputBaseFilename=Elite_AI_Bridge_Setup_1.0.1
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -38,7 +38,7 @@ InfoBeforeFile=README_FIRST.txt
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; The proven RC1 payload is installed intact. The .venv is created after file copy.
+; The tested 1.0.1 payload is installed intact. The .venv is created after file copy.
 Source: "Elite AI Bridge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 

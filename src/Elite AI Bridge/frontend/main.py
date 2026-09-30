@@ -20,6 +20,8 @@ from typing import Any
 from PySide6.QtCore import QObject, Property, QSettings, QTimer, QUrl, Signal, Slot, Qt, QEvent
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QWindow, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtWidgets import QApplication
+from boot_splash import BootSplash
 
 INTEGRATION_VERSION = "0.30.20"
 LIVE_COMMANDS = {
@@ -291,29 +293,64 @@ class BackendProcess:
         return self.request("/command", method="POST", payload=payload, timeout=1.0)
 
     def stop(self) -> None:
+        """Gracefully stop the backend, then forcibly reap its whole process tree.
+
+        The Bridge backend may own fallback PowerShell/System.Speech workers. A
+        normal Popen.terminate() only terminates the backend Python process on
+        Windows, which can leave a child process behind after the GUI closes.
+        Always try the application-level /shutdown first, then use taskkill /T
+        as the final Windows safety net so no backend Python/voice child survives.
+        """
         proc = self.process
+        self.process = None
         if proc is None:
             return
-        if proc.poll() is None:
-            try:
-                self.request("/shutdown", method="POST", payload={}, timeout=0.35)
-            except Exception:
-                pass
-            try:
-                proc.wait(timeout=3.0)
-            except subprocess.TimeoutExpired:
-                proc.terminate()
+
+        pid = int(getattr(proc, "pid", 0) or 0)
+        try:
+            if proc.poll() is None:
                 try:
-                    proc.wait(timeout=1.5)
+                    self.request("/shutdown", method="POST", payload={}, timeout=0.45)
+                except Exception:
+                    pass
+                try:
+                    proc.wait(timeout=2.5)
                 except subprocess.TimeoutExpired:
-                    proc.kill()
-        self.process = None
-        if self._log_handle is not None:
-            try:
-                self._log_handle.close()
-            except Exception:
-                pass
-            self._log_handle = None
+                    if os.name == "nt" and pid:
+                        try:
+                            subprocess.run(
+                                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=5.0,
+                                check=False,
+                            )
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                    try:
+                        proc.wait(timeout=2.0)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
+                        try:
+                            proc.wait(timeout=1.0)
+                        except Exception:
+                            pass
+        finally:
+            if self._log_handle is not None:
+                try:
+                    self._log_handle.close()
+                except Exception:
+                    pass
+                self._log_handle = None
 
 
 class BridgeViewModel(QObject):
@@ -3051,32 +3088,102 @@ if __name__ == "__main__":
         print("Elite AI Bridge is already running. Activated the existing window.", file=sys.stderr)
         raise SystemExit(0)
 
+    # BootSplash is a QWidget, so the application object must be QApplication,
+    # not QGuiApplication. QApplication is still a QGuiApplication subclass,
+    # so the existing QML/GUI behavior remains compatible.
+    app = QApplication(sys.argv)
+    app.setApplicationName(f"Elite AI Bridge v{APP_VERSION}")
+    app_icon = _resource_path(Path("assets") / "Elite_AI_Bridge.ico")
+    if app_icon.exists():
+        app.setWindowIcon(QIcon(str(app_icon)))
+
+    # The CRT boot screen is deliberately created before the backend and heavy
+    # QML scene. It gives the pilot immediate visual feedback while the real
+    # application initializes underneath it.
+    boot_settings = QSettings("EliteAIBridge", "QMLFrontend")
+    screens = list(QGuiApplication.screens())
+    boot_screen = QGuiApplication.primaryScreen() or (screens[0] if screens else None)
+    saved_key = str(boot_settings.value("display/last_screen", "") or "")
+    saved_name = saved_key.split("|", 1)[0] if saved_key else ""
+    for candidate in screens:
+        try:
+            g = candidate.geometry()
+            key = f"{candidate.name()}|{g.x()},{g.y()},{g.width()},{g.height()}"
+            if saved_key and key == saved_key:
+                boot_screen = candidate
+                break
+        except Exception:
+            pass
+    else:
+        if saved_name:
+            for candidate in screens:
+                try:
+                    if candidate.name() == saved_name:
+                        boot_screen = candidate
+                        break
+                except Exception:
+                    pass
+
+    boot_art = _resource_path(Path("frontend") / "assets" / "elite_ai_bridge_boot_sequence.png")
+    splash = BootSplash(boot_screen, boot_art)
+    splash.showFullScreen()
+    splash.raise_()
+    app.processEvents()
+
     backend = BackendProcess()
     try:
         backend.start()
     except Exception as exc:
         print(f"Failed to start backend: {exc}", file=sys.stderr)
 
-    app = QGuiApplication(sys.argv)
-    app.setApplicationName(f"Elite AI Bridge v{APP_VERSION}")
-    app_icon = _resource_path(Path("assets") / "Elite_AI_Bridge.ico")
-    if app_icon.exists():
-        app.setWindowIcon(QIcon(str(app_icon)))
-    engine = QQmlApplicationEngine()
     vm = BridgeViewModel(backend)
     app.installEventFilter(vm)
     app.aboutToQuit.connect(vm.shutdown)
+
+    engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("bridge", vm)
     qml_file = _resource_path(Path("frontend") / "qml" / "Main.qml")
     engine.load(QUrl.fromLocalFile(str(qml_file)))
     if not engine.rootObjects():
+        splash.close()
         vm.shutdown()
         raise SystemExit(2)
+
     window = engine.rootObjects()[0]
     vm.attach_window(window)
     vm.restore_window_monitor()
     window.showMaximized()
+    splash.set_main_window(window)
+
+    def boot_ready() -> bool:
+        try:
+            if not bool(vm.connected):
+                return False
+            if bool(vm.voiceEngineWarming):
+                return False
+            return True
+        except Exception:
+            return False
+
+    splash.set_ready_probe(boot_ready)
+
+    # The main window is already visible behind the CRT screen. Keep the boot
+    # animation alive until the Bridge has actually connected and the voice engine
+    # has finished its warm-up, but never trap a degraded startup behind the splash.
+    def keep_splash_on_top():
+        if splash.isVisible() and window.isVisible():
+            splash.raise_()
+
+    splash_stack_timer = QTimer()
+    splash_stack_timer.setInterval(250)
+    splash_stack_timer.timeout.connect(keep_splash_on_top)
+    # BootSplash uses WA_DeleteOnClose. Stop the timer before Qt destroys the
+    # widget so a queued timeout cannot call methods on a deleted C++ object.
+    splash.destroyed.connect(splash_stack_timer.stop)
+    splash_stack_timer.start()
+
     exit_code = app.exec()
+    splash_stack_timer.stop()
     # aboutToQuit normally performs this cleanup. Calling it again is safe because
     # BridgeViewModel.shutdown() is idempotent and guarantees the backend process,
     # timers and worker pools are not left holding the extracted application folder.

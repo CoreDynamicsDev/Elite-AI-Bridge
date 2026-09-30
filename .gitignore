@@ -1,42 +1,30 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
 .venv/
 venv/
+env/
 
-# Secrets / environment
-.env
-.env.*
-*.key
-*.pem
-secrets.*
-credentials.*
-*api_key*
-!docs/PRIVACY_AND_API_KEYS.md
+# Build output
+Output/
+build/
+dist/
+*.exe
+*.msi
 
-# Runtime/user data
-logs/
-support/
-diagnostics/
+# Local diagnostics/logs
 *.log
-*.tmp
-*.bak
+logs/
+diagnostics/
+*_Diagnostics_*.zip
 
-# IDE/OS
+# Local application data / developer state
+.env
+*.local
+
+# IDE / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-desktop.ini
-
-# Installer output
-installer/Output/
-Output/
-*.exe
-*.msi
-
-# Local build staging
-build/
-dist/
-release/
