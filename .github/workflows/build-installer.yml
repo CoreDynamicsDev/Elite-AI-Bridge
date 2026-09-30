@@ -1,0 +1,89 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'installer/**'
+      - 'docs/**'
+      - 'LICENSE.txt'
+      - '.github/workflows/build-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-installer:
+    name: Build Elite AI Bridge 1.0.1
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate repository layout
+        shell: pwsh
+        run: |
+          $required = @(
+            "src/Elite AI Bridge/frontend/main.py",
+            "src/Elite AI Bridge/backend/backend_host.py",
+            "src/Elite AI Bridge/backend/EliteAIBridge_v0_12_95.py",
+            "src/Elite AI Bridge/Launch_Elite_AI_Bridge.vbs",
+            "installer/Elite_AI_Bridge_Setup.iss",
+            "docs/README_FIRST.txt",
+            "LICENSE.txt"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Required build file is missing: $path"
+            }
+          }
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
+            $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) {
+            throw "Inno Setup 6 compiler could not be located."
+          }
+          "ISCC=$iscc" >> $env:GITHUB_ENV
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "installer/Output" | Out-Null
+          & "$env:ISCC" "installer/Elite_AI_Bridge_Setup.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Generate SHA-256 checksum
+        shell: pwsh
+        run: |
+          $exe = "installer/Output/Elite_AI_Bridge_Setup_1.0.1.exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Expected installer was not created: $exe"
+          }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
+          "$hash  Elite_AI_Bridge_Setup_1.0.1.exe" | Set-Content -Encoding ascii "installer/Output/SHA256SUMS.txt"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Elite_AI_Bridge_1.0.1_Windows_Installer
+          path: |
+            installer/Output/Elite_AI_Bridge_Setup_1.0.1.exe
+            installer/Output/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
