@@ -23,7 +23,7 @@ OutputBaseFilename=Elite_AI_Bridge_Setup_1.0.1
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=Elite AI Bridge\assets\Elite_AI_Bridge.ico
+SetupIconFile=..\src\Elite AI Bridge\assets\Elite_AI_Bridge.ico
 UninstallDisplayIcon={app}\assets\Elite_AI_Bridge.ico
 UninstallDisplayName=Elite AI Bridge
 CreateUninstallRegKey=yes
@@ -31,16 +31,16 @@ ChangesEnvironment=no
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
-LicenseFile=LICENSE.txt
-InfoBeforeFile=README_FIRST.txt
+LicenseFile=..\LICENSE.txt
+InfoBeforeFile=..\docs\README_FIRST.txt
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; The tested 1.0.1 payload is installed intact. The .venv is created after file copy.
-Source: "Elite AI Bridge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
+; Public repository layout: installer definitions live under installer\,
+; while the complete application payload lives under src\Elite AI Bridge\.
+Source: "..\src\Elite AI Bridge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{localappdata}\EliteAIBridge"
@@ -55,8 +55,6 @@ Name: "{autodesktop}\Elite AI Bridge"; Filename: "{sys}\wscript.exe"; Parameters
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce
 
 [Run]
-; Prepare the private runtime using the same tested PowerShell bootstrap logic,
-; but skip its file-copy/shortcut phase because Inno has already installed files.
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\Installer_Runtime_Setup.ps1"""; StatusMsg: "Preparing Elite AI Bridge runtime..."; Flags: runhidden waituntilterminated
 Filename: "{sys}\wscript.exe"; Parameters: """{app}\Launch_Elite_AI_Bridge.vbs"""; Description: "Launch Elite AI Bridge"; Flags: nowait postinstall skipifsilent
 
