@@ -45,17 +45,32 @@ jobs:
       - name: Install Inno Setup 6
         shell: pwsh
         run: |
-          $candidates = @(
-            "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
-            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-          )
-          $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
           if (-not $iscc) {
-            winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
+            $candidates = @(
+              "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
+              "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+            )
             $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
           }
           if (-not $iscc) {
-            throw "Inno Setup 6 compiler could not be located."
+            winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
+          }
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+          if (-not $iscc) {
+            $candidates = @(
+              "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
+              "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+              "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+            )
+            $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) {
+            $roots = @($env:ProgramFiles, $env:ProgramFiles, "$env:LOCALAPPDATA\Programs")
+            $iscc = Get-ChildItem -Path $roots -Filter ISCC.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          }
+          if (-not $iscc) {
+            throw "Inno Setup 6 compiler could not be located after installation."
           }
           "ISCC=$iscc" >> $env:GITHUB_ENV
 
