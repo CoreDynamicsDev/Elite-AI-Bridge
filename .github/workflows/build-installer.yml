@@ -66,7 +66,7 @@ jobs:
             $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
           }
           if (-not $iscc) {
-            $roots = @($env:ProgramFiles, $env:ProgramFiles, "$env:LOCALAPPDATA\Programs")
+            $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, "$env:LOCALAPPDATA\Programs")
             $iscc = Get-ChildItem -Path $roots -Filter ISCC.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
           }
           if (-not $iscc) {
