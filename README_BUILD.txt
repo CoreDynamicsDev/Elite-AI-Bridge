@@ -1,0 +1,28 @@
+ELITE AI BRIDGE 2.0.0 - INSTALLER SOURCE
+
+This source package contains the 2.0.0 build: the retro redesign, setup wizard,
+guided tours, in-game overlay and the Supertonic local voice. Python bytecode
+caches are not part of the release source.
+
+COMPILE ON WINDOWS
+1. Install Inno Setup 6 if it is not already installed.
+2. Double-click BUILD_INSTALLER.bat.
+3. Finished installer: Output\Elite_AI_Bridge_Setup_2.0.0.exe
+
+TEST BEFORE UPLOAD
+Install the generated EXE on a Windows user account that has never run the Bridge
+and check:
+- The setup wizard runs from the first screen to READY.
+- The ship voice speaks (Setup > Status shows the voice as ready).
+- The taskbar and shortcuts show the Elite AI Bridge icon.
+- With an OpenAI key: paste it in the wizard, push to talk and get an answer.
+
+Do not replace the public release until the generated installer has passed that test.
+
+SOURCE RUN
+RUN_CURRENT_SOURCE.bat launches the same source the installer packages, using the
+Bridge's own runtime. RUN_SPLASH_PREVIEW.bat plays the boot splash on its own.
+
+SHORTCUTS
+The Start menu and desktop shortcuts run the runtime's own pythonw.exe (signed by the Python
+Software Foundation) with frontend\main.py. There is no launcher program of our own.

@@ -1,0 +1,11 @@
+Fonts used by the Elite AI Bridge retro skin. All are licensed under the
+SIL Open Font License 1.1 (https://openfontlicense.org), which allows bundling
+them with software, free or paid. Keep this note with the font files.
+
+VT323                Copyright (c) Peter Hull                        CRT screen text
+Oswald               Copyright (c) The Oswald Project Authors        hardware labels, key legends, tape
+Saira Stencil One    Copyright (c) The Saira Project Authors         stencilled titles
+DSEG7 Classic        Copyright (c) keshikan                          LED clock
+Share Tech Mono      Copyright (c) Carrois Apostrophe                mechanical counters
+
+The full license text is in OFL.txt, next to this file.

@@ -1,0 +1,10 @@
+ELITE AI BRIDGE 2.0.0 - SOURCE BUILD
+
+1. Extract the entire ZIP.
+2. Double-click RUN_CURRENT_SOURCE.bat in the top folder.
+3. On the first run, a setup window creates the private Python environment,
+   installs the required packages including Supertonic, and prepares the
+   Supertonic voice model. Internet access is required for this first run.
+4. After setup completes, Elite AI Bridge launches and the setup wizard starts.
+
+Later launches can use RUN_CURRENT_SOURCE.bat again.

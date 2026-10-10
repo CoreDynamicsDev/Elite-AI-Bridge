@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets / environment
+.env
+.env.*
+*.key
+*.pem
+secrets.*
+credentials.*
+
+# Runtime / user data
+logs/
+support/
+diagnostics/
+*.log
+*.tmp
+*.bak
+
+# Build output (installers belong in GitHub Releases)
+Output/
+build/
+dist/
+*.exe
+*.msi
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

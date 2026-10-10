@@ -1,0 +1,18 @@
+Elite AI Bridge Community Release License
+
+Copyright (c) 2026 Elite AI Bridge.
+
+Permission is granted to use this software for personal, non-commercial use.
+
+Unless separate written permission is provided, this license does not grant permission
+to sell, commercially redistribute, repackage, sublicense, or represent modified copies
+as an official Elite AI Bridge release.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS OR
+COPYRIGHT HOLDERS SHALL NOT BE LIABLE FOR CLAIMS, DAMAGES, OR OTHER LIABILITY ARISING
+FROM USE OF OR INABILITY TO USE THE SOFTWARE.
+
+Third-party software and intellectual property included with or referenced by Elite AI
+Bridge remain subject to their own licenses and rights.
