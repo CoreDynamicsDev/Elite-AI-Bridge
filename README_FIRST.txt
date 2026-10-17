@@ -1,4 +1,4 @@
-ELITE AI BRIDGE 2.0.1
+ELITE AI BRIDGE 2.0.2
 
 Elite AI Bridge is a free cockpit companion for Elite Dangerous. Version 2.0 is a
 complete redesign: a retro command deck with a setup wizard, guided tours on every

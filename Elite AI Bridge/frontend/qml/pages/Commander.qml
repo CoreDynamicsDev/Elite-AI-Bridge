@@ -66,6 +66,19 @@ Item {
     readonly property int used: Math.max(0, bridge.cargoUsed)
 
     // ---------- deck helpers
+    // ---------- 2.0.2 FLEET: stored ships (swap only when the content changes, so scroll holds)
+    property var fleet: []
+    property string fleetKey: ""
+    readonly property var liveFleet: bridge.commanderFleet || []
+    onLiveFleetChanged: { var k = JSON.stringify(liveFleet); if (k !== fleetKey) { fleetKey = k; fleet = liveFleet } }
+    property int fleetSel: -1                       // picked ShipID
+    readonly property var fleetPick: {
+        for (var i = 0; i < fleet.length; i++) if (Number(fleet[i].shipId) === fleetSel) return fleet[i]
+        return null
+    }
+    function hereSys(sys) { return String(sys || "").toLowerCase() !== "" && String(sys || "").toLowerCase() === String(bridge.system || "").toLowerCase() }
+    function mmss(sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h > 0 ? h + " H " + m + " MIN" : m + " MIN" }
+
     readonly property string bstate: String(bridge.bridgeState || "").toUpperCase()
     readonly property bool inControl: bridge.controlOwner !== "NONE" && bridge.controlOwner !== ""
     readonly property bool bindsReady: bridge.eliteControlsReady
@@ -498,13 +511,23 @@ Item {
         property int page: 0
         onPagesChanged: if (page >= pages) page = 0
         readonly property var shown: pool.slice(page * per, page * per + per)
-        Dymo { id: oDymo; x: 26 * cm.s; y: 14 * cm.s; text: "ODD STATS" }
+        property int view: 0          // 2.0.2: 0 odd stats, 1 fleet (stored ships)
+        Dymo { id: oDymo; x: 26 * cm.s; y: 14 * cm.s; text: oddPlate.view === 1 ? "FLEET" : "ODD STATS" }
         Caption { x: oDymo.x + oDymo.width + 20 * cm.s; anchors.verticalCenter: oDymo.verticalCenter
-                  width: parent.width - x - 24 * cm.s; elide: Text.ElideRight
-                  text: oddPlate.pages > 1 ? "PAGE " + (oddPlate.page + 1) + " OF " + oddPlate.pages : "" }
+                  width: oddSel.x - x - 12 * cm.s; elide: Text.ElideRight
+                  text: oddPlate.view === 1 ? (cm.fleet.length > 0 ? cm.fleet.length + " STORED" : "")
+                        : (oddPlate.pages > 1 ? "PAGE " + (oddPlate.page + 1) + " OF " + oddPlate.pages : "") }
+        SelectorRow {
+            id: oddSel
+            anchors.right: parent.right; anchors.rightMargin: 24 * cm.s; y: 10 * cm.s
+            options: ["ODD STATS", "FLEET"]
+            buttonWidth: 118 * cm.s; buttonHeight: 32 * cm.s
+            currentIndex: oddPlate.view
+            onPicked: (i) => oddPlate.view = i
+        }
         Timer {
             interval: 9000; repeat: true
-            running: oddPlate.visible && oddPlate.pages > 1
+            running: oddPlate.visible && oddPlate.view === 0 && oddPlate.pages > 1
             onTriggered: oddFlip.restart()
         }
         SequentialAnimation {
@@ -524,6 +547,7 @@ Item {
             readonly property real rowH: fs * 2.55
             Column {
                 id: oList
+                visible: oddPlate.view === 0
                 x: 14 * cm.s; y: 8 * cm.s; width: oBezel.iw - 28 * cm.s
                 Repeater {
                     model: oddPlate.shown
@@ -541,9 +565,61 @@ Item {
                     }
                 }
             }
-            Text { visible: oddPlate.pool.length === 0; anchors.centerIn: parent; width: oBezel.iw - 40 * cm.s
+            Text { visible: oddPlate.view === 0 && oddPlate.pool.length === 0; anchors.centerIn: parent; width: oBezel.iw - 40 * cm.s
                    horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
                    text: "THE ODD NUMBERS ARRIVE WHEN YOU LOAD INTO ELITE"; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
+
+            // ---- FLEET: every stored ship, nearest first. Click a row, then PLOT: SHIP.
+            Item {
+                id: fleetView
+                visible: oddPlate.view === 1
+                x: 14 * cm.s; y: 8 * cm.s; width: oBezel.iw - 28 * cm.s; height: oBezel.ih - 16 * cm.s
+                readonly property real rowH: oBezel.fs * 2.55
+                PhosphorList {
+                    id: fleetList
+                    width: parent.width; height: parent.height - fleetFoot.height - 8 * cm.s
+                    fontSize: oBezel.fs * 0.8
+                    model: cm.fleet
+                    delegate: Item {
+                        id: frow
+                        required property var modelData
+                        required property int index
+                        width: fleetList.list.width; height: fleetView.rowH
+                        readonly property bool picked: Number(modelData.shipId) === cm.fleetSel
+                        readonly property bool here: cm.hereSys(modelData.system)
+                        readonly property bool transit: String(modelData.status) === "IN TRANSIT"
+                        Rectangle { anchors.fill: parent; anchors.bottomMargin: 3 * cm.s; color: Theme.phosphor
+                                    opacity: frow.picked ? 0.16 : (fHover.containsMouse ? 0.07 : 0) }
+                        Text { x: 4 * cm.s; y: 2 * cm.s; text: frow.picked ? ">" : ""; color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
+                        Text { x: 22 * cm.s; y: 2 * cm.s; width: parent.width * 0.6 - x; elide: Text.ElideRight
+                               text: cm.up(String(modelData.name || "") !== "" ? modelData.name : modelData.typeName)
+                               color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
+                        Text { anchors.right: parent.right; anchors.rightMargin: 6 * cm.s; y: 2 * cm.s; horizontalAlignment: Text.AlignRight
+                               width: parent.width * 0.4
+                               text: frow.transit ? "ARRIVES IN " + cm.mmss(modelData.arriveIn)
+                                     : (frow.here ? "IN THIS SYSTEM" : (Number(modelData.ly) >= 0 ? Number(modelData.ly).toFixed(1) + " LY" : "? LY"))
+                               color: frow.transit ? Theme.info : (frow.here ? Theme.ok : Theme.phosphor)
+                               font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.85 }
+                        Text { x: 22 * cm.s; y: oBezel.fs * 1.15; width: parent.width - x - 6 * cm.s; elide: Text.ElideRight
+                               text: (String(modelData.name || "") !== "" ? cm.up(modelData.typeName) + " // " : "")
+                                     + cm.up(modelData.station) + " // " + cm.up(modelData.system)
+                                     + (Number(modelData.value) > 0 ? " // " + cm.compact(modelData.value) + " CR" : "")
+                                     + (modelData.hot ? " // HOT" : "")
+                               color: modelData.hot ? Theme.info : Theme.phosphor; opacity: 0.7
+                               font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.72 }
+                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 2 * cm.s; width: parent.width; height: 1; color: "#227dff9c" }
+                        MouseArea { id: fHover; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: cm.fleetSel = frow.picked ? -1 : Number(frow.modelData.shipId) }
+                    }
+                }
+                Text { visible: cm.fleet.length === 0; anchors.centerIn: fleetList; width: parent.width - 40 * cm.s
+                       horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+                       text: String(bridge.commanderFleetStatus); color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
+                Text { id: fleetFoot; anchors.bottom: parent.bottom; width: parent.width; elide: Text.ElideRight
+                       visible: cm.fleet.length > 0
+                       text: String(bridge.commanderFleetStatus) + " // PICK A SHIP, THEN PLOT: SHIP"
+                       color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.68 }
+            }
         }
     }
 
@@ -577,6 +653,23 @@ Item {
             }
             Groove { width: deck.divW; height: deck.keyH }
             DeckKey {
+                id: plotShip
+                width: deck.keyW * 1.1; height: deck.keyH
+                title: "PLOT: SHIP"
+                readonly property string sys: cm.fleetPick ? String(cm.fleetPick.system || "") : ""
+                legend: cm.fleetPick ? cm.up(cm.fleetPick.system) : "PICK A SHIP"
+                keyState: sys === "" ? "unavailable" : (cm.bindsReady ? "ready" : "unavailable")
+                unavailableReason: sys === "" ? "OPEN FLEET AND PICK A STORED SHIP FIRST" : cm.bindsReason
+                tooltip: sys !== "" ? "PLOT A ROUTE TO " + cm.up(sys) : "PLOT A ROUTE TO A STORED SHIP"
+                tooltipDetail: "THE ROUTE SHOWS UP ON NAVIGATION"
+                onActivated: {
+                    if (cm.hereSys(sys)) cm.notice("ALREADY HERE", "YOUR " + cm.up(cm.fleetPick.name || cm.fleetPick.typeName) + " IS IN THIS SYSTEM", "info")
+                    bridge.plotRoute(sys)
+                }
+                onDenied: (r) => { if (sys === "") oddPlate.view = 1; cm.denied("PLOT: SHIP UNAVAILABLE", r) }
+            }
+            Groove { width: deck.divW; height: deck.keyH }
+            DeckKey {
                 id: dockKey
                 width: deck.keyW; height: deck.keyH
                 title: "DOCK"
@@ -602,6 +695,7 @@ Item {
             }
         }
         Caption { x: dRow.x + dockKey.x + (launchKey.x + launchKey.width - dockKey.x) / 2 - width / 2; y: deck.keyY - height - 6 * cm.s; text: "FLIGHT" }
+        Caption { x: dRow.x + plotShip.x + plotShip.width / 2 - width / 2; y: deck.keyY - height - 6 * cm.s; text: "FLEET" }
         Item {
             x: deck.width - deck.cancelW - 40 * cm.s; y: deck.keyY; width: deck.cancelW; height: deck.keyH
             Glow { target: ck; color: "#ff5040"; spread: 34 * cm.s; radius: 8 * cm.s; intensity: cm.inControl ? 0.8 : 0 }

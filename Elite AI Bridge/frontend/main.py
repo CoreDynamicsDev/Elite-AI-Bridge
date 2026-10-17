@@ -39,7 +39,7 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.0.2"
 # 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
 # It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
 UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
@@ -3506,6 +3506,12 @@ class BridgeViewModel(QObject):
 
     @Property("QVariantList", notify=stateChanged)
     def commanderOddStats(self): return list(self._get("commanderOddStats", []) or [])
+
+    @Property("QVariantList", notify=stateChanged)
+    def commanderFleet(self): return list(self._get("commanderFleet", []) or [])
+
+    @Property(str, notify=stateChanged)
+    def commanderFleetStatus(self): return _string(self._get("commanderFleetStatus"), "READING YOUR JOURNALS...")
 
     @Property(str, notify=stateChanged)
     def commanderLine(self): return _string(self._get("commanderLine"), "")

@@ -713,7 +713,7 @@ class BootSplash(QWidget):
 
     # ------------------------------------------------------------------ scenes
     def _draw_selftest(self, p, t):
-        s, _ = typed("CORE DYNAMICS DEV  //  BRIDGE SYSTEMS  //  UNIT 2.0.1", t, 0.62, 70)
+        s, _ = typed("CORE DYNAMICS DEV  //  BRIDGE SYSTEMS  //  UNIT 2.0.2", t, 0.62, 70)
         self._text(p, (46, 46), s, "vt", 32, G, 0.95)
         s2, _ = typed("COLD START SEQUENCE", t, 1.15, 50)
         self._text(p, (46, 86), s2, "vt", 32, G, 0.7)

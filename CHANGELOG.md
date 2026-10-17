@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.2 - 2026-10-17
+
+### New
+- Fleet: on the Commander page, switch ODD STATS to FLEET to see where every stored ship
+  is, nearest first, with station, system and value; ships in transit show when they
+  arrive. Pick one and PLOT: SHIP plots a route to it. Read from the game journal, as of
+  your last shipyard visit.
+
 ## 2.0.1 - 2026-10-16
 
 ### New

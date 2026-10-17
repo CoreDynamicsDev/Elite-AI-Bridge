@@ -8,7 +8,7 @@ set "EAB_PY=%EAB_RUNTIME%\Scripts\python.exe"
 set "NEED_SETUP=0"
 
 echo ============================================
-echo         ELITE AI BRIDGE 2.0.1
+echo         ELITE AI BRIDGE 2.0.2
 echo ============================================
 echo.
 

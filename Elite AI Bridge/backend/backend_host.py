@@ -1965,7 +1965,7 @@ class _ColonySiteScanner:
     journal is followed for new lines. Depot numbers are as of the last visit.
     """
     STALE_DAYS = 30
-    LINE_RX = re.compile(rb'^[^\n]*"event"\s*:\s*"(?:Colonisation\w+|Docked|Location|FSDJump|CarrierJump|FSSSignalDiscovered)"[^\n]*$', re.M)
+    LINE_RX = re.compile(rb'^[^\n]*"event"\s*:\s*"(?:Colonisation\w+|Docked|Location|FSDJump|CarrierJump|FSSSignalDiscovered|StoredShips|Shipyard\w+|SellShipOnRebuy|Loadout)"[^\n]*$', re.M)
 
     def __init__(self, journal_dir):
         self.journal_dir = Path(journal_dir)
@@ -1981,6 +1981,12 @@ class _ColonySiteScanner:
         self.busy = False
         self.done = False
         self.lock = threading.Lock()
+        # 2.0.2 FLEET (Commander page): stored ships. The full list comes from StoredShips
+        # (written when a shipyard opens); swaps, buys, sells and transfers since then keep it current.
+        self.ships: dict[int, dict] = {}         # ship id -> {type, typeName, name, ident, value, system, marketId, arrive, hot}
+        self.ship_names: dict[int, dict] = {}    # ship id -> name / ident / value from Loadout
+        self.current_ship_id = None
+        self.fleet_ts = ""                       # last StoredShips snapshot
 
     @staticmethod
     def _key(name):
@@ -1997,6 +2003,9 @@ class _ColonySiteScanner:
     def _event(self, e):
         ev = e.get("event")
         ts = str(e.get("timestamp") or "")
+        if ev in ("StoredShips", "Loadout", "SellShipOnRebuy") or str(ev).startswith("Shipyard"):
+            self._fleet_event(ev, e, ts)
+            return
         if ev in ("FSDJump", "Location", "CarrierJump"):
             pos = e.get("StarPos")
             name = e.get("StarSystem")
@@ -2077,6 +2086,129 @@ class _ColonySiteScanner:
                 "complete": bool(e.get("ConstructionComplete")), "failed": bool(e.get("ConstructionFailed")),
                 "ts": ts,
             }
+
+    # ---- FLEET ---------------------------------------------------------------
+    @staticmethod
+    def _int(v):
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+    def _store_ship(self, sid, stype, market_id, ts, type_name=""):
+        """A ship was put into storage where the commander is docked now."""
+        if sid is None:
+            return
+        old = self.ships.get(sid) or {}
+        where = self.dock.get(market_id) if market_id is not None else None
+        known = self.ship_names.get(sid) or {}
+        self.ships[sid] = {
+            "type": str(stype or old.get("type") or ""), "typeName": str(type_name or old.get("typeName") or ""),
+            "name": known.get("name") or old.get("name") or "", "ident": known.get("ident") or old.get("ident") or "",
+            "value": old.get("value") or known.get("value") or 0,
+            "system": (where or {}).get("system") or old.get("system") or "-", "marketId": market_id,
+            "arrive": 0.0, "hot": bool(old.get("hot")), "ts": ts,
+        }
+
+    def _fleet_event(self, ev, e, ts):
+        if ev == "Loadout":
+            sid = self._int(e.get("ShipID"))
+            if sid is None:
+                return
+            try:
+                value = float(e.get("HullValue") or 0) + float(e.get("ModulesValue") or 0)
+            except Exception:
+                value = 0
+            self.ship_names[sid] = {"name": str(e.get("ShipName") or "").strip(), "ident": str(e.get("ShipIdent") or "").strip(),
+                                    "value": value, "type": str(e.get("Ship") or "")}
+            self.current_ship_id = sid
+            self.ships.pop(sid, None)            # flying it, so it isn't stored
+            return
+        if ev == "StoredShips":
+            here_mid = self._int(e.get("MarketID"))
+            here_sys = str(e.get("StarSystem") or "-")
+            ships = {}
+            for row, remote in [(r, False) for r in (e.get("ShipsHere") or [])] + [(r, True) for r in (e.get("ShipsRemote") or [])]:
+                sid = self._int(row.get("ShipID"))
+                if sid is None:
+                    continue
+                transit = bool(row.get("InTransit"))
+                arrive = 0.0
+                ships[sid] = {
+                    "type": str(row.get("ShipType") or ""), "typeName": str(row.get("ShipType_Localised") or ""),
+                    "name": str(row.get("Name") or "").strip(), "ident": (self.ship_names.get(sid) or {}).get("ident", ""),
+                    "value": row.get("Value") or 0,
+                    "system": str(row.get("StarSystem") or "-") if remote else here_sys,
+                    "marketId": self._int(row.get("ShipMarketID")) if remote else here_mid,
+                    "arrive": arrive, "transit": transit, "hot": bool(row.get("Hot")), "ts": ts,
+                }
+            # a transfer already in flight keeps its arrival time
+            for sid, row in ships.items():
+                old = self.ships.get(sid) or {}
+                if old.get("arrive", 0) and old.get("marketId") == row["marketId"]:
+                    row["arrive"] = old["arrive"]
+            self.ships = ships
+            self.fleet_ts = ts
+            return
+        if ev == "ShipyardSwap":
+            # old ship stays here, the new one is now flown (Loadout follows)
+            self._store_ship(self._int(e.get("StoreShipID")), e.get("StoreOldShip"), self._int(e.get("MarketID")), ts)
+            sid = self._int(e.get("ShipID"))
+            if sid is not None:
+                self.ships.pop(sid, None)
+                self.current_ship_id = sid
+        elif ev == "ShipyardBuy":
+            if e.get("StoreShipID") is not None:
+                self._store_ship(self._int(e.get("StoreShipID")), e.get("StoreOldShip"), self._int(e.get("MarketID")), ts)
+            if e.get("SellShipID") is not None:
+                self.ships.pop(self._int(e.get("SellShipID")), None)
+        elif ev == "ShipyardNew":
+            sid = self._int(e.get("NewShipID"))
+            if sid is not None:
+                self.ships.pop(sid, None)
+                self.current_ship_id = sid
+        elif ev in ("ShipyardSell", "SellShipOnRebuy"):
+            self.ships.pop(self._int(e.get("SellShipID")), None)
+        elif ev == "ShipyardTransfer":
+            sid = self._int(e.get("ShipID"))
+            if sid is None:
+                return
+            self._store_ship(sid, e.get("ShipType"), self._int(e.get("MarketID")), ts, e.get("ShipType_Localised") or "")
+            try:
+                self.ships[sid]["arrive"] = self._epoch(ts) + float(e.get("TransferTime") or 0)
+            except Exception:
+                pass
+
+    def fleet_rows(self, here=None):
+        """Stored ships, nearest first. The ship being flown is not listed (Elite stores it nowhere)."""
+        with self.lock:
+            ships = {k: dict(v) for k, v in self.ships.items()}
+            names = {k: dict(v) for k, v in self.ship_names.items()}
+            here = here if here is not None else self.here
+            current = self.current_ship_id
+            ts = self.fleet_ts
+        out = []
+        now = time.time()
+        for sid, sh in ships.items():
+            if sid == current:
+                continue
+            known = names.get(sid) or {}
+            name = (sh.get("name") or known.get("name") or "").strip()
+            mid = sh.get("marketId")
+            station = (self.dock.get(mid) or {}).get("station", "") if mid is not None else ""
+            left = max(0.0, float(sh.get("arrive") or 0) - now)
+            status = "IN TRANSIT" if (sh.get("transit") or left > 0) else "STORED"
+            out.append({
+                "shipId": sid, "type": sh.get("type") or known.get("type") or "", "typeName": sh.get("typeName") or "",
+                "name": name, "ident": sh.get("ident") or known.get("ident") or "",
+                "value": float(sh.get("value") or known.get("value") or 0),
+                "system": sh.get("system") or "-", "station": station or "-",
+                "ly": self._ly(sh.get("system") or "", here), "status": status,
+                "arriveIn": int(left), "hot": bool(sh.get("hot")),
+            })
+        out.sort(key=lambda r: (r["ly"] if r["ly"] >= 0 else 1e9, r["system"].lower(), -r["value"]))
+        age, _ = self._age(ts) if ts else ("-", -1)
+        return out, age
 
     def _read_file(self, path):
         name = path.name
@@ -5287,8 +5419,8 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             ("CAREER", "Career shows Elite's own lifetime totals, updated each time you load into the game: credits, total worth, profits, systems, jumps, ships and time played."),
             ("THIS SESSION", "This Session counts what has happened since the Bridge started: jumps, dockings, sales, bounties and AI requests."),
             ("YOUR SHIP", "Your current ship with hull, fuel, cargo and jump range."),
-            ("ODD STATS", "The strange numbers: how often you've been scanned this session, passengers you've ejected, the farthest you've been from home. It pages through them on its own."),
-            ("ACTION KEYS", "Refresh re-reads your record. Dock and Launch work the same as on every page, and Cancel stops all automation. Want to report a bug? Setup, Status shows you how."),
+            ("ODD STATS", "The strange numbers: how often you've been scanned this session, passengers you've ejected, the farthest you've been from home. It pages through them on its own. Switch it to Fleet to see where every stored ship is, nearest first, as of your last shipyard visit."),
+            ("ACTION KEYS", "Refresh re-reads your record. Pick a ship in Fleet and Plot Ship plots a route to it. Dock and Launch work the same as on every page, and Cancel stops all automation. Want to report a bug? Setup, Status shows you how."),
         ],
         6: [
             ("SHIP VOICE", "This is the Voice and AI page. Ship Voice chooses how the ship sounds and how much it talks. Quiet still warns you about danger."),
@@ -10577,6 +10709,28 @@ class BridgeHost:
             out.append(row)
         return out
 
+    def _fleet_extras(self, snap):
+        """2.0.2 FLEET: stored ships from the same journal scan as MY SITES."""
+        scanner = getattr(self, "colony_site_scanner", None)
+        if scanner is None or not scanner.done:
+            snap["commanderFleet"] = []
+            snap["commanderFleetStatus"] = "READING YOUR JOURNALS..."
+            return
+        rows, age = scanner.fleet_rows()
+        for r in rows:
+            if not r.get("typeName"):
+                try:
+                    r["typeName"] = self._pretty_ship_name(r.get("type"))
+                except Exception:
+                    r["typeName"] = str(r.get("type") or "-")
+        snap["commanderFleet"] = rows
+        if not scanner.fleet_ts:
+            snap["commanderFleetStatus"] = "OPEN A SHIPYARD ONCE AND YOUR STORED SHIPS SHOW UP HERE"
+        else:
+            n = len(rows)
+            snap["commanderFleetStatus"] = (f"{n} STORED SHIP{'S' if n != 1 else ''} // AS OF YOUR LAST SHIPYARD VISIT, {age}"
+                                            if n else f"NO STORED SHIPS // AS OF YOUR LAST SHIPYARD VISIT, {age}")
+
     def _commander_extras(self, snap):
         app = self.app
         s = app.state_data
@@ -11241,6 +11395,10 @@ class BridgeHost:
                 self._commander_extras(snap)
             except Exception:
                 pass
+            try:
+                self._fleet_extras(snap)
+            except Exception:
+                snap["commanderFleet"] = []
             self.shared.set(snap)
         except Exception as exc:
             snap = self.shared.get()
