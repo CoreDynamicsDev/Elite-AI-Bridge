@@ -10,6 +10,7 @@ Item {
     property string noticeDetail: ""
     property string noticeLevel: "info"
     signal masterCautionPressed()
+    signal updatePressed()
 
     readonly property real s: Theme.s
     readonly property bool tourActive: app.firstOrientationActive || bridge.pageHelpActive
@@ -53,7 +54,7 @@ Item {
     // ---------- title
     Item {
         id: titleBlock
-        x: 34 * hdr.s; width: titleText.implicitWidth; height: parent.height
+        x: 34 * hdr.s; width: Math.max(titleText.implicitWidth, updTag.visible ? updTag.x + updTag.width : 0); height: parent.height
         Text {
             id: titleText
             y: parent.height / 2 - height + 8 * hdr.s
@@ -61,7 +62,27 @@ Item {
             font.family: Theme.stencilFont; font.pixelSize: Math.max(26, 60 * hdr.s); font.letterSpacing: 4 * hdr.s
             color: "#d8d0b8"; style: Text.Sunken; styleColor: "#1a1915"
         }
-        Dymo { x: 6 * hdr.s; y: titleText.y + titleText.height + 6 * hdr.s; text: "CORE DYNAMICS DEV // UNIT 2.0.0" }
+        Dymo { id: verDymo; x: 6 * hdr.s; y: titleText.y + titleText.height + 6 * hdr.s; text: "CORE DYNAMICS DEV // UNIT " + bridge.appVersion }
+        // 2.0.1: update tag beside the version. Slow amber pulse, always on screen (the status
+        // screen gets taken by in-game alerts). Click opens SETUP > STATUS.
+        Item {
+            id: updTag
+            visible: bridge.updateAvailable
+            x: verDymo.x + verDymo.width + 12 * hdr.s
+            y: verDymo.y + (verDymo.height - height) / 2
+            width: updRow.width; height: Math.max(updLamp.height, updTape.height)
+            Row {
+                id: updRow; spacing: 8 * hdr.s
+                anchors.verticalCenter: parent.verticalCenter
+                Lamp { id: updLamp; width: 20 * hdr.s; height: width; lit: "a"; breathe: !updHover.containsMouse; anchors.verticalCenter: parent.verticalCenter }
+                Dymo { id: updTape; small: true; text: "UPDATE " + bridge.updateLatestVersion; anchors.verticalCenter: parent.verticalCenter
+                    Rectangle { anchors.fill: parent; radius: 1; color: "#ffffff"; opacity: updHover.containsMouse ? 0.16 : 0
+                        Behavior on opacity { NumberAnimation { duration: 120 } } } }
+            }
+            MouseArea { id: updHover; anchors.fill: parent; anchors.margins: -6 * hdr.s; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                onClicked: hdr.updatePressed() }
+            RetroToolTip { text: "UPDATE AVAILABLE // " + bridge.updateLatestVersion + " // CLICK FOR WHAT'S NEW"; shown: updHover.containsMouse; x: 0; y: parent.height + 10 * hdr.s }
+        }
     }
     Rectangle { id: groove1; x: titleBlock.x + titleBlock.width + 34 * hdr.s; y: parent.height * 0.18; width: 3 * hdr.s; height: parent.height * 0.64; color: "#1b1a16"; border.color: "#5e5a4c"; border.width: 1 }
 
@@ -75,8 +96,8 @@ Item {
             model: [
                 { name: "LINK",  lit: bridge.connected ? "g" : "a",
                   tip: bridge.connected ? "BRIDGE ENGINE LINKED" : "BRIDGE ENGINE STARTING" },
-                { name: "ELITE", lit: bridge.eliteTelemetryState === "CONNECTED" ? "g" : (bridge.eliteTelemetryState === "WAITING" ? "a" : "r"),
-                  tip: "ELITE DATA // " + bridge.eliteTelemetryState },
+                { name: "ELITE", lit: bridge.eliteTelemetryState === "CONNECTED" ? "g" : ((bridge.eliteTelemetryState === "WAITING" || bridge.eliteTelemetryState === "MENU") ? "a" : "r"),
+                  tip: "ELITE DATA // " + (bridge.eliteTelemetryState === "MENU" ? "AT MAIN MENU" : bridge.eliteTelemetryState) },
                 { name: "VOICE", lit: hdr.rowLevel("AUDIO OUTPUT") === "ok" ? "g" : "a",
                   tip: "AUDIO OUTPUT // " + (hdr.rowValue("AUDIO OUTPUT") || "-") },
                 { name: "AI",    lit: hdr.rowValue("AI / VOICE") === "OFF" ? "" : (hdr.rowLevel("AI / VOICE") === "ok" ? "g" : "a"),
@@ -244,6 +265,10 @@ Item {
                 return ["SHIELDS OFFLINE", hdr.flightAlert ? bridge.alertDetail : "SHIELDS DOWN", Theme.bad]
             if (hdr.flightAlert)
                 return [bridge.alertDetail, bridge.alertValue + " ACTIVE ALERT" + (bridge.alertValue === "1" ? "" : "S"), bridge.alertLevel === "bad" ? Theme.bad : Theme.info]
+            if (bridge.updateAvailable && String(bridge.bridgeState || "IDLE") === "IDLE")
+                return ["UPDATE AVAILABLE // " + bridge.updateLatestVersion, "SEE SETUP > STATUS", Theme.info]
+            if (bridge.eliteTelemetryState === "MENU")
+                return ["ELITE AT MAIN MENU", "LOAD IN // THE BRIDGE PICKS UP YOUR SHIP", Theme.info]
             if (bridge.eliteTelemetryState !== "CONNECTED")
                 return [bridge.eliteTelemetryState === "WAITING" ? "WAITING FOR ELITE" : "ELITE NOT RUNNING",
                         "START ELITE DANGEROUS // THE BRIDGE CONNECTS BY ITSELF", Theme.info]

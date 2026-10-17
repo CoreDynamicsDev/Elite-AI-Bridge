@@ -163,9 +163,10 @@ Item {
         x: st.leftW + st.g; y: 0
         width: st.width - x
         spacing: st.g
-        readonly property real h1: st.bodyH * 0.27
-        readonly property real h2: st.bodyH * 0.25
-        readonly property real h3: st.bodyH - h1 - h2 - spacing * 2
+        readonly property real h1: st.bodyH * 0.2
+        readonly property real h2: st.bodyH * 0.17
+        readonly property real hU: st.bodyH * 0.33
+        readonly property real h3: st.bodyH - h1 - h2 - hU - spacing * 3
 
         // ---- name
         Plate {
@@ -230,6 +231,81 @@ Item {
             }
         }
 
+        // ---- 2.0.1: version and update notice. The Bridge only asks GitHub which release is
+        // newest; DOWNLOAD opens the release page in the browser. Nothing installs by itself.
+        Plate {
+            id: updPlate
+            width: parent.width; height: sideCol.hU
+            screwSize: 13 * st.s
+            readonly property bool avail: bridge.updateAvailable
+            readonly property real fs: Math.max(11, Math.min(20 * st.s, height / 13))
+            Dymo { id: verTape; x: 26 * st.s; y: 14 * st.s; text: "BRIDGE VERSION // " + bridge.appVersion }
+            Lamp { visible: updPlate.avail; lit: "a"; breathe: true; width: 20 * st.s; height: width
+                   x: verTape.x + verTape.width + 14 * st.s; y: verTape.y + (verTape.height - height) / 2 }
+            Item {
+                anchors.right: parent.right; anchors.rightMargin: 26 * st.s; y: 8 * st.s
+                width: updRocker.width + updLabel.width + 12 * st.s; height: 46 * st.s
+                Text {
+                    id: updLabel
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "CHECK DAILY"
+                    color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * st.s); font.letterSpacing: 2 * st.s
+                }
+                OnOffPair {
+                    id: updRocker
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    buttonWidth: 66 * st.s; buttonHeight: 40 * st.s
+                    on: bridge.updateCheckEnabled
+                    onChanged: (v) => bridge.setUpdateCheckEnabled(v)
+                }
+            }
+            Bezel {
+                id: updBezel
+                x: 16 * st.s; y: 66 * st.s
+                width: parent.width - 32 * st.s; height: parent.height - y - updKeys.height - 26 * st.s
+                pad: 10 * st.s
+                Text {
+                    id: updHead
+                    x: 14 * st.s; y: 8 * st.s; width: updBezel.width - 2 * updBezel.pad - 28 * st.s; elide: Text.ElideRight
+                    text: updPlate.avail ? "UPDATE AVAILABLE // " + bridge.updateLatestVersion : String(bridge.updateStatusText)
+                    color: updPlate.avail ? Theme.info : (bridge.updateCheckEnabled ? Theme.ok : Theme.dimText)
+                    font.family: Theme.crtFont; font.pixelSize: updPlate.fs * 1.15
+                }
+                Flickable {
+                    id: notesFlick
+                    x: 14 * st.s; y: updHead.y + updHead.height + 6 * st.s
+                    width: updHead.width; height: updBezel.height - 2 * updBezel.pad - y - 6 * st.s
+                    clip: true; contentHeight: notesText.height; boundsBehavior: Flickable.StopAtBounds
+                    Text {
+                        id: notesText
+                        width: notesFlick.width; wrapMode: Text.WordWrap; textFormat: Text.PlainText
+                        text: updPlate.avail
+                              ? (bridge.updateNotes !== "" ? "WHAT'S NEW\n" + String(bridge.updateNotes) : "WHAT'S NEW IS ON THE RELEASE PAGE.")
+                              : "ONCE A DAY THE BRIDGE ASKS GITHUB IF THERE IS A NEWER VERSION. IT NEVER DOWNLOADS OR INSTALLS ANYTHING BY ITSELF."
+                        color: updPlate.avail ? Theme.phosphor : Theme.dimText
+                        font.family: Theme.crtFont; font.pixelSize: updPlate.fs * 0.8
+                    }
+                }
+            }
+            Row {
+                id: updKeys
+                x: 26 * st.s; y: parent.height - height - 14 * st.s
+                spacing: 14 * st.s
+                height: 44 * st.s
+                LitButton {
+                    visible: updPlate.avail
+                    width: 230 * st.s; height: parent.height; centered: true
+                    title: "DOWNLOAD " + bridge.updateLatestVersion
+                    onActivated: { bridge.openUpdatePage(); st.notice("OPENING THE RELEASE PAGE", "DOWNLOAD THE INSTALLER AND RUN IT // YOUR SETTINGS ARE KEPT", "info") }
+                }
+                LitButton {
+                    width: 200 * st.s; height: parent.height; centered: true
+                    title: "CHECK NOW"
+                    onActivated: bridge.checkForUpdatesNow()
+                }
+            }
+        }
+
         // ---- AI usage
         Plate {
             width: parent.width; height: sideCol.h3
@@ -245,14 +321,14 @@ Item {
                     text: "An estimate from the Bridge's own count. Your OpenAI account shows the real bill." }
             Bezel {
                 id: uBezel
-                x: 16 * st.s; y: 110 * st.s
+                x: 16 * st.s; y: 100 * st.s
                 width: parent.width - 32 * st.s; height: parent.height - 126 * st.s
                 pad: 10 * st.s
-                readonly property real fs: Math.max(11, Math.min(22 * st.s, (height - 20 * st.s) / 6.5))
+                readonly property real fs: Math.max(11, Math.min(22 * st.s, (height - 2 * pad) / 2.4))
                 Grid {
-                    x: 14 * st.s; y: 10 * st.s
-                    columns: 2; columnSpacing: 20 * st.s; rowSpacing: uBezel.fs * 0.35
-                    readonly property real cw: (uBezel.width - uBezel.pad * 2 - 28 * st.s - columnSpacing) / 2
+                    x: 14 * st.s; anchors.verticalCenter: parent.verticalCenter
+                    columns: 4; columnSpacing: 16 * st.s; rowSpacing: uBezel.fs * 0.35
+                    readonly property real cw: (uBezel.width - uBezel.pad * 2 - 28 * st.s - columnSpacing * 3) / 4
                     Repeater {
                         model: [
                             { label: "ESTIMATED COST", value: String(bridge.aiUsageEstimatedCostText || "-") },

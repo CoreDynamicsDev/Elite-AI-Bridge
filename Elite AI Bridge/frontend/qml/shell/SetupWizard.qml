@@ -57,6 +57,7 @@ Item {
     readonly property string eliteCase: {
         if (bridge.eliteTelemetryState === "CONNECTED") return "RUNNING"
         var c = String(bridge.commander || "")
+        if (bridge.eliteTelemetryState === "MENU") return "MENU"
         return (c !== "" && c !== "-") ? "FILES" : "NONE"
     }
     function known(v) { v = String(v || ""); return (v === "-" || v === "UNKNOWN") ? "" : v }
@@ -145,6 +146,10 @@ Item {
                     sub: "THAT'S YOU, UP TOP.",
                     amber: overlayCaution ? "ONE THING: SET ELITE TO BORDERLESS IF YOU WANT THE IN-GAME OVERLAY." : "",
                     keys: [["NEXT", "LOOKS RIGHT", "next"]] }
+            if (eliteCase === "MENU") return { small: "ELITE AT MAIN MENU", big: "ELITE IS UP.",
+                    line: cmdrName ? "LAST TIME: " + cmdrName.toUpperCase() + (shipText ? ", IN THE " + shipText.toUpperCase() : "") + "." : "",
+                    amber: "LOAD INTO THE GAME WHEN YOU'RE READY. I'LL PICK UP YOUR SHIP BY ITSELF.",
+                    keys: [["LOOK AGAIN", "I'M IN NOW", "look"], ["NEXT", "CARRY ON", "next"]] }
             if (eliteCase === "FILES") return { small: "LOOKING FOR ELITE...", big: "FOUND YOUR ELITE FILES.",
                     line: "LAST TIME: " + cmdrName.toUpperCase() + (shipText ? ", IN THE " + shipText.toUpperCase() : "") + (systemText ? " AT " + systemText.toUpperCase() : "") + ".",
                     amber: "ELITE ISN'T RUNNING. THAT'S FINE: START IT ANY TIME AND I'LL PICK IT UP.",

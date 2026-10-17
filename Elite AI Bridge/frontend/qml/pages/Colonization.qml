@@ -608,7 +608,8 @@ Item {
                            text: parent.st === "CLAIMED" ? "-" : co.num(modelData.left) + " T"
                            color: parent.st === "BUILDING" ? Theme.phosphor : Theme.dimText; font.family: Theme.crtFont; font.pixelSize: pList.fontSize }
                     Text { x: parent.width * aBezel.cx[6]; anchors.verticalCenter: parent.verticalCenter
-                           text: parent.st; color: parent.stColor; font.family: Theme.crtFont; font.pixelSize: pList.fontSize }
+                           text: parent.st; color: parent.stColor; opacity: parent.st === "NOT SEEN" ? 0.6 : 1.0
+                           font.family: Theme.crtFont; font.pixelSize: pList.fontSize }
                     Text { anchors.right: parent.right; anchors.rightMargin: 6 * co.s; anchors.verticalCenter: parent.verticalCenter
                            text: String(modelData.lastSeen).replace("CLAIMED ", ""); color: Number(modelData.ageHours) >= 0 && Number(modelData.ageHours) < 24 ? Theme.phosphor : Theme.dimText
                            font.family: Theme.crtFont; font.pixelSize: pList.fontSize * 0.85 }
@@ -627,7 +628,7 @@ Item {
                 Text { width: parent.width; elide: Text.ElideRight
                        text: String(bridge.colonizationMySitesStatus || ""); color: Theme.phosphor; opacity: 0.8; font.family: Theme.crtFont; font.pixelSize: aBezel.fs * 0.75 }
                 Text { width: parent.width; elide: Text.ElideRight
-                       text: "EVERY BUILD SITE YOU HAVE DOCKED AT // PROGRESS IS AS OF YOUR LAST VISIT // PICK A ROW, THEN PLOT: SITE"; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: aBezel.fs * 0.75 }
+                       text: "PROGRESS AS OF YOUR LAST VISIT // NOT SEEN = NO VISIT IN 30 DAYS, MAY BE FINISHED OR GONE // PICK A ROW, THEN PLOT: SITE"; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: aBezel.fs * 0.75 }
             }
         }
     }

@@ -128,7 +128,7 @@ Item {
                     blip: deck.shipState === "unmatched"
                     title: deck.shipState === "none" ? "NO SHIP DATA" : "NO SIGNATURE MATCH"
                     line2: deck.shipState === "none"
-                           ? (!deck.eliteLive ? "ELITE NOT RUNNING" : (String(bridge.pilotPlace) === "FOOT" ? "ON FOOT" : (String(bridge.pilotPlace) === "SRV" ? "SRV DEPLOYED" : "WAITING FOR SHIP DATA")))
+                           ? (!deck.eliteLive ? (bridge.eliteTelemetryState === "MENU" ? "AT MAIN MENU // LOAD IN" : (bridge.eliteTelemetryState === "WAITING" ? "WAITING FOR ELITE" : "ELITE NOT RUNNING")) : (String(bridge.pilotPlace) === "FOOT" ? "ON FOOT" : (String(bridge.pilotPlace) === "SRV" ? "SRV DEPLOYED" : "WAITING FOR SHIP DATA")))
                            : "CLASS NOT ON FILE"
                     line3: ""
                 }

@@ -1964,6 +1964,7 @@ class _ColonySiteScanner:
     thread, only lines with the few events it needs are parsed), then the newest
     journal is followed for new lines. Depot numbers are as of the last visit.
     """
+    STALE_DAYS = 30
     LINE_RX = re.compile(rb'^[^\n]*"event"\s*:\s*"(?:Colonisation\w+|Docked|Location|FSDJump|CarrierJump|FSSSignalDiscovered)"[^\n]*$', re.M)
 
     def __init__(self, journal_dir):
@@ -1984,6 +1985,14 @@ class _ColonySiteScanner:
     @staticmethod
     def _key(name):
         return re.sub(r"[^a-z0-9]+", "", str(name or "").lower())
+
+    @staticmethod
+    def _epoch(ts):
+        try:
+            import calendar
+            return float(calendar.timegm(time.strptime(str(ts)[:19], "%Y-%m-%dT%H:%M:%S")))
+        except Exception:
+            return -1.0
 
     def _event(self, e):
         ev = e.get("event")
@@ -2034,6 +2043,11 @@ class _ColonySiteScanner:
         elif ev == "ColonisationSystemClaimRelease":
             name = str(e.get("StarSystem") or e.get("SystemName") or "").strip()
             self.claims.pop(self._key(name), None)
+            # 2.0.1: a released system's build sites go with it
+            gone_addr = str(e.get("SystemAddress") or "")
+            for mid in [m for m, v in self.sites.items()
+                        if self._key(v.get("system")) == self._key(name) or (gone_addr and str(v.get("address") or "") == gone_addr)]:
+                self.sites.pop(mid, None)
         elif ev == "ColonisationConstructionDepot":
             try:
                 mid = int(e.get("MarketID"))
@@ -2134,6 +2148,7 @@ class _ColonySiteScanner:
         with self.lock:
             claimed = dict(self.claims)
             sites = [dict(v) for v in self.sites.values()]
+
             here = here if here is not None else self.here
         out = []
         seen_systems = set()
@@ -2152,11 +2167,20 @@ class _ColonySiteScanner:
             if status == "BUILDING" and finished_seen and finished_seen > site["ts"]:
                 status = "COMPLETE"      # seen since as a finished station
                 seen_ts = finished_seen
+            if status == "BUILDING":
+                # 2.0.1: Elite writes nothing when a site is abandoned, removed, or finishes
+                # under a new name, so an old snapshot would say BUILDING forever. No visit for
+                # 30 days = NOT SEEN (we can't tell which). Checked against a real journal
+                # history: Elite does not reliably list orbital build sites when you arrive in
+                # a system, so a missing signal is NOT treated as proof a site is gone.
+                last = self._epoch(site["ts"])
+                if last >= 0 and time.time() - last > self.STALE_DAYS * 86400:
+                    status = "NOT SEEN"
             age, hours = self._age(seen_ts)
             out.append({
                 "system": site["system"], "station": name, "kind": kind,
                 "status": status, "progressPct": 100.0 if status == "COMPLETE" else round(site["progressPct"], 1),
-                "total": site["total"], "left": 0 if status == "COMPLETE" else site["left"],
+                "total": site["total"], "left": 0 if status in ("COMPLETE", "GONE") else site["left"],
                 "lastSeen": age, "ageHours": round(hours, 2),
                 "marketId": site["marketId"], "ly": self._ly(site["system"], here),
                 "claimed": key in claimed,
@@ -2168,7 +2192,7 @@ class _ColonySiteScanner:
             out.append({"system": claim["system"], "station": "-", "kind": "-", "status": "CLAIMED",
                         "progressPct": 0.0, "total": 0, "left": 0, "lastSeen": "CLAIMED " + age, "ageHours": round(hours, 2),
                         "marketId": -1, "ly": self._ly(claim["system"], here), "claimed": True})
-        order = {"BUILDING": 0, "CLAIMED": 1, "COMPLETE": 2, "FAILED": 3}
+        order = {"BUILDING": 0, "CLAIMED": 1, "NOT SEEN": 2, "COMPLETE": 3, "GONE": 4, "FAILED": 5}
         out.sort(key=lambda r: (order.get(r["status"], 9), r["ly"] if r["ly"] >= 0 else 1e9, r["system"].lower(), r["station"].lower()))
         return out
 
@@ -2737,6 +2761,26 @@ def _level_color_name(level: str) -> str:
 
 _ELITE_PROCESS_CACHE = {"checked": 0.0, "running": None}
 
+_SESSION_STATUS_KEYS = ("Pips", "Fuel", "GuiFocus", "LegalState", "Cargo", "Destination", "Oxygen", "Health", "SelectedWeapon")
+
+
+def _elite_in_session(status):
+    """True when Status.json describes a commander in a ship, SRV or on foot.
+
+    At the main menu Elite writes only {"timestamp", "event", "Flags": 0}. In a
+    session it adds Flags/Flags2 bits and fields such as Pips, Fuel and GuiFocus.
+    An unreadable status counts as in session so this never hides real data.
+    """
+    if not isinstance(status, dict):
+        return True
+    try:
+        if int(status.get("Flags", 0) or 0) or int(status.get("Flags2", 0) or 0):
+            return True
+    except Exception:
+        return True
+    return any(k in status for k in _SESSION_STATUS_KEYS)
+
+
 def _elite_process_running():
     """Return True/False on Windows, None when process probing is unavailable.
 
@@ -2998,6 +3042,12 @@ def build_live_snapshot(app: legacy.BridgeApp) -> dict[str, Any]:
         elite_telemetry_state = "CONNECTED" if telemetry_ok else "WAITING"
     else:
         elite_telemetry_state = "CONNECTED" if telemetry_ok else "OFFLINE"
+    # 2.0.1: Elite also writes Status.json at the main menu, with Flags 0 and no ship
+    # data. That is not a session yet, so it must not count as CONNECTED (the deck used
+    # to show shields down, no cargo and so on at the menu). MENU = game running, not
+    # loaded into a ship or on foot.
+    if elite_telemetry_state == "CONNECTED" and not _elite_in_session(getattr(s, "status", None)):
+        elite_telemetry_state = "MENU"
 
     # Never turn missing telemetry into plausible ship state. Status flags default
     # to false, which previously made a clean PC look like a real ship in normal
@@ -3006,7 +3056,7 @@ def build_live_snapshot(app: legacy.BridgeApp) -> dict[str, Any]:
     elite_live = elite_telemetry_state == "CONNECTED"
     app._qml_elite_state = elite_telemetry_state      # setup wizard narration (CONNECT TO ELITE)
     if not elite_live:
-        game_state = "ELITE OFFLINE" if elite_telemetry_state == "OFFLINE" else "WAITING FOR ELITE"
+        game_state = {"OFFLINE": "ELITE OFFLINE", "MENU": "MAIN MENU"}.get(elite_telemetry_state, "WAITING FOR ELITE")
         fsd_state = "UNKNOWN"
         hull_percent = -1
         fuel_percent = -1
@@ -3051,7 +3101,8 @@ def build_live_snapshot(app: legacy.BridgeApp) -> dict[str, Any]:
     ai_credits_out = bool(getattr(app, "_qml_ai_credits_out", False))
 
     system_rows = [
-        {"label": "ELITE DATA", "value": elite_telemetry_state, "level": "ok" if elite_telemetry_state == "CONNECTED" else "warn"},
+        {"label": "ELITE DATA", "value": "AT MAIN MENU" if elite_telemetry_state == "MENU" else elite_telemetry_state,
+         "level": "ok" if elite_telemetry_state == "CONNECTED" else ("info" if elite_telemetry_state == "MENU" else "warn")},
         {
             "label": "AI / VOICE",
             "value": ("NO CREDITS" if ai_credits_out else ("THINKING" if app.copilot_busy else ("READY" if ai_api_verified else "CHECK API"))) if copilot_mode else "OFF",
@@ -8527,6 +8578,8 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         state = str(getattr(self, "_qml_elite_state", "") or "")
         if state == "CONNECTED":
             return "RUNNING", cmdr, ship, system
+        if state == "MENU":
+            return "MENU", cmdr, ship, system
         if cmdr:
             return "FILES", cmdr, ship, system
         return "NONE", cmdr, ship, system
@@ -8541,6 +8594,8 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             where = f" Flying the {ship}" if ship else ""
             if case == "RUNNING":
                 return f"Found you, {cmdr}." + (f"{where}." if where else "") + " That's you, up top."
+            if case == "MENU":
+                return "Elite is up, at the main menu. Load into the game when you're ready and I'll pick up your ship by myself."
             if case == "FILES":
                 last = f" Last time, {cmdr}" + (f", in the {ship}" if ship else "") + "."
                 return "Found your Elite files." + last + " Elite isn't running. That's fine. Start it any time and I'll pick it up."
@@ -10457,7 +10512,9 @@ class BridgeHost:
         else:
             systems = len({r["system"].lower() for r in rows})
             building = sum(1 for r in rows if r["status"] == "BUILDING")
-            snap["colonizationMySitesStatus"] = (f"{len(rows)} SITE{'S' if len(rows) != 1 else ''} IN {systems} SYSTEM{'S' if systems != 1 else ''} // {building} STILL BUILDING // FROM {scanner.files_read} JOURNAL FILES"
+            unsure = sum(1 for r in rows if r["status"] in ("NOT SEEN", "GONE"))
+            snap["colonizationMySitesStatus"] = (f"{len(rows)} SITE{'S' if len(rows) != 1 else ''} IN {systems} SYSTEM{'S' if systems != 1 else ''} // {building} STILL BUILDING"
+                                                 + (f" // {unsure} NOT SEEN OR GONE" if unsure else "") + f" // FROM {scanner.files_read} JOURNAL FILES"
                                                  if rows else f"NO CONSTRUCTION SITES FOUND IN {scanner.files_read} JOURNAL FILES // DOCK AT ONE TO ADD IT")
 
     # ---- Commander page ------------------------------------------------------

@@ -39,7 +39,12 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
+# 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
+# It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
+UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
+UPDATE_PAGE_URL = "https://github.com/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
+UPDATE_CHECK_EVERY_S = 24 * 3600
 
 NAV_COMMANDS = {"nav_plot", "nav_memory_plot", "nav_memory_set", "nav_memory_capture"}
 ELITE_INPUT_COMMANDS = {
@@ -363,6 +368,8 @@ class BridgeViewModel(QObject):
     crtChanged = Signal()
     suggestionsArrived = Signal(object, str, int)
     systemInfoArrived = Signal(object, int)
+    updateChanged = Signal()
+    updateResultArrived = Signal(object)
 
     def __init__(self, backend: BackendProcess):
         super().__init__()
@@ -431,6 +438,18 @@ class BridgeViewModel(QObject):
         self.poll_timer.timeout.connect(self._poll_backend)
         self.poll_timer.start(250)
         QTimer.singleShot(25, self._poll_backend)
+
+        # 2.0.1 update notice: first look 8 s after start, then every 6 h while running.
+        # The 24 h limit between real checks is kept in settings, so relaunching often
+        # never asks GitHub more than once a day.
+        self._update_checking = False
+        self._update_error = False
+        self._update_retry_after = 0.0
+        self.updateResultArrived.connect(self._apply_update_result)
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(lambda: self._maybe_check_updates(False))
+        self.update_timer.start(6 * 3600 * 1000)
+        QTimer.singleShot(8000, lambda: self._maybe_check_updates(False))
 
     @staticmethod
     def _initial_state() -> dict[str, Any]:
@@ -1105,6 +1124,139 @@ class BridgeViewModel(QObject):
         self._settings.setValue("setup/show_first_run", 1 if bool(enabled) else 0)
         self._settings.sync()
         self.displayChanged.emit()
+
+    # ------------------------------------------------------------------ 2.0.1 update notice
+    @staticmethod
+    def _version_tuple(text: str) -> tuple:
+        nums = re.findall(r"\d+", str(text or "").split("-", 1)[0])
+        return tuple(int(n) for n in nums[:4]) if nums else ()
+
+    def _setting_float(self, key: str) -> float:
+        try:
+            return float(self._settings.value(key, 0) or 0)
+        except Exception:
+            return 0.0
+
+    @Property(str, constant=True)
+    def appVersion(self) -> str:
+        return APP_VERSION
+
+    @Property(bool, notify=updateChanged)
+    def updateCheckEnabled(self) -> bool:
+        value = self._settings.value("updates/check_enabled", True)
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+    @Slot(bool)
+    def setUpdateCheckEnabled(self, enabled: bool) -> None:
+        self._settings.setValue("updates/check_enabled", 1 if bool(enabled) else 0)
+        self._settings.sync()
+        self.updateChanged.emit()
+        if enabled:
+            self._maybe_check_updates(False)
+
+    @Property(str, notify=updateChanged)
+    def updateLatestVersion(self) -> str:
+        return str(self._settings.value("updates/latest_tag", "") or "").lstrip("vV")
+
+    @Property(bool, notify=updateChanged)
+    def updateAvailable(self) -> bool:
+        if not self.updateCheckEnabled:
+            return False
+        latest = self._version_tuple(self.updateLatestVersion)
+        return bool(latest) and latest > self._version_tuple(APP_VERSION)
+
+    @Property(str, notify=updateChanged)
+    def updateNotes(self) -> str:
+        return str(self._settings.value("updates/notes", "") or "")
+
+    @Property(str, notify=updateChanged)
+    def updateStatusText(self) -> str:
+        if not self.updateCheckEnabled:
+            return "UPDATE CHECKS ARE OFF"
+        if self._update_checking:
+            return "CHECKING GITHUB..."
+        last = self._setting_float("updates/last_check")
+        if self.updateAvailable:
+            return f"VERSION {self.updateLatestVersion} IS OUT // YOU HAVE {APP_VERSION}"
+        if self._update_error and last <= 0:
+            return "COULD NOT REACH GITHUB // TRIES AGAIN LATER"
+        if last <= 0:
+            return "NOT CHECKED YET"
+        mins = max(0, int((time.time() - last) // 60))
+        ago = f"{mins} MIN AGO" if mins < 60 else (f"{mins // 60} HR AGO" if mins < 1440 else f"{mins // 1440} DAYS AGO")
+        return f"UP TO DATE // CHECKED {ago}"
+
+    @staticmethod
+    def _plain_notes(body: str) -> str:
+        # Release notes are shown as plain text only: no links are opened from them.
+        lines = []
+        for raw in str(body or "").replace("\r", "").split("\n"):
+            line = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", raw)       # [text](link) -> text
+            bullet = bool(re.match(r"^\s*[-*+]\s+", line))
+            line = re.sub(r"^\s*[-*+]\s+", "", line)
+            line = re.sub(r"[`*_>#]+", "", line).strip()
+            if bullet and line:
+                line = "- " + line
+            if line or (lines and lines[-1]):
+                lines.append(line)
+            if len(lines) >= 40:
+                break
+        return "\n".join(lines).strip()[:3000]
+
+    def _maybe_check_updates(self, force: bool) -> None:
+        if self._shutting_down or self._update_checking:
+            return
+        if not force:
+            if not self.updateCheckEnabled:
+                return
+            if time.time() - self._setting_float("updates/last_check") < UPDATE_CHECK_EVERY_S:
+                return
+            if time.time() < self._update_retry_after:
+                return
+        self._update_checking = True
+        self.updateChanged.emit()
+
+        def work():
+            try:
+                req = urllib.request.Request(UPDATE_API_URL, headers={
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": f"Elite-AI-Bridge/{APP_VERSION}",
+                })
+                with urllib.request.urlopen(req, timeout=8.0) as response:
+                    data = json.loads(response.read(500_000).decode("utf-8", errors="replace") or "{}")
+                tag = str(data.get("tag_name") or "").strip()
+                if not tag or data.get("draft") or data.get("prerelease"):
+                    return {"ok": False}
+                return {"ok": True, "tag": tag, "notes": str(data.get("body") or "")}
+            except Exception:
+                return {"ok": False}
+        future = self._suggest_executor.submit(work)
+        future.add_done_callback(lambda fut: self.updateResultArrived.emit(fut.result() if not fut.exception() else {"ok": False}))
+
+    @Slot(object)
+    def _apply_update_result(self, result: object) -> None:
+        self._update_checking = False
+        result = result if isinstance(result, dict) else {"ok": False}
+        if result.get("ok"):
+            self._update_error = False
+            self._settings.setValue("updates/last_check", time.time())
+            self._settings.setValue("updates/latest_tag", str(result.get("tag") or ""))
+            self._settings.setValue("updates/notes", self._plain_notes(str(result.get("notes") or "")))
+            self._settings.sync()
+        else:
+            self._update_error = True
+            self._update_retry_after = time.time() + 3600      # offline or GitHub busy: quietly try again in an hour
+        self.updateChanged.emit()
+
+    @Slot()
+    def checkForUpdatesNow(self) -> None:
+        self._maybe_check_updates(True)
+
+    @Slot()
+    def openUpdatePage(self) -> None:
+        QDesktopServices.openUrl(QUrl(UPDATE_PAGE_URL))
 
     @Slot()
     def markFirstRunSetupCompleted(self) -> None:
@@ -2401,7 +2553,7 @@ class BridgeViewModel(QObject):
         query = urllib.parse.urlencode(params)
         req = urllib.request.Request(
             "https://www.edsm.net/" + path + "?" + query,
-            headers={"Accept": "application/json", "User-Agent": "Elite-AI-Bridge-QML/2.0.0"},
+            headers={"Accept": "application/json", "User-Agent": f"Elite-AI-Bridge-QML/{APP_VERSION}"},
         )
         with urllib.request.urlopen(req, timeout=4.0) as response:
             raw = response.read(2_000_000)

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.1 - 2026-10-16
+
+### New
+- Update notice: once a day the Bridge asks GitHub if a newer version is out. When one is,
+  a slow amber lamp and an UPDATE tag appear next to the version under the title (click it to
+  open Setup > Status), and Setup > Status shows the release notes with a DOWNLOAD key that
+  opens the release page. Nothing is downloaded or installed by itself; CHECK DAILY turns it off.
+
+### Fixes
+- ELITE lamp shows amber AT MAIN MENU until you load in, instead of green with empty ship data.
+- Colonization, My Sites: sites not visited in 30 days show NOT SEEN instead of BUILDING
+  forever, and releasing a system claim clears that system's sites.
+
 ## 2.0.0 - 2026-10-10
 
 A complete redesign of Elite AI Bridge.

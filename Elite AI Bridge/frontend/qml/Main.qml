@@ -803,6 +803,7 @@ Window {
         notice: root.deckNotice
         noticeDetail: root.deckNoticeDetail
         noticeLevel: root.deckNoticeLevel
+        onUpdatePressed: root.currentPage = 8
         onMasterCautionPressed: {
             // Setup problems are listed on SETUP > SYSTEM. Flight alerts are already on the header screen.
             if (header.setupProblems.length > 0 && !header.shieldsDown && !header.flightAlert) {

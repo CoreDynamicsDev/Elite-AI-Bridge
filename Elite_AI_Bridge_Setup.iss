@@ -1,5 +1,5 @@
 #define MyAppName "Elite AI Bridge"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.0.1"
 #define MyAppPublisher "Elite AI Bridge"
 #define MyAppURL "https://ko-fi.com/eliteaibridge"
 ; 2.0.0: shortcuts run the runtime's own pythonw.exe (signed by the Python Software Foundation)
@@ -22,7 +22,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=Output
-OutputBaseFilename=Elite_AI_Bridge_Setup_2.0.0
+OutputBaseFilename=Elite_AI_Bridge_Setup_2.0.1
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
