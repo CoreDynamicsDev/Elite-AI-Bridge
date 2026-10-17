@@ -41,12 +41,13 @@ services (EDDN, EDData, Ardent Insight, EDSM and INTRA) with your current locati
 search settings. These are independent services with their own terms.
 
 ## Update check
-Once a day, the Bridge asks GitHub which Elite AI Bridge release is the newest
-(api.github.com, the public CoreDynamicsDev/Elite-AI-Bridge-Download releases). It sends
+Each time it starts, and every 6 hours while it is open, the Bridge asks GitHub which
+Elite AI Bridge release is the newest (api.github.com, the public
+CoreDynamicsDev/Elite-AI-Bridge-Download releases). It sends
 no game, account or personal data; GitHub sees an ordinary web request from your computer.
 The Bridge never downloads or installs an update by itself. If a newer version exists,
 Setup > Status shows what's new and a DOWNLOAD key that opens the release page in your
-browser. Turn the check off with CHECK DAILY on Setup > Status.
+browser. Turn the check off with CHECK FOR UPDATES on Setup > Status.
 
 ## Diagnostics
 Diagnostic/support exports (Setup > Status > MAKE SUPPORT FILE) may contain technical information such as application state,

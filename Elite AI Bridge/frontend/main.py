@@ -39,12 +39,12 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.2"
+APP_VERSION = "2.0.3"
 # 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
 # It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
 UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
 UPDATE_PAGE_URL = "https://github.com/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
-UPDATE_CHECK_EVERY_S = 24 * 3600
+UPDATE_CHECK_EVERY_S = 6 * 3600     # 2.0.3: every launch, then every 6 h while running
 
 NAV_COMMANDS = {"nav_plot", "nav_memory_plot", "nav_memory_set", "nav_memory_capture"}
 ELITE_INPUT_COMMANDS = {
@@ -439,16 +439,16 @@ class BridgeViewModel(QObject):
         self.poll_timer.start(250)
         QTimer.singleShot(25, self._poll_backend)
 
-        # 2.0.1 update notice: first look 8 s after start, then every 6 h while running.
-        # The 24 h limit between real checks is kept in settings, so relaunching often
-        # never asks GitHub more than once a day.
+        # Update notice: asks GitHub 8 s after every start, then every 6 h while running
+        # (2.0.3: the old once-a-day limit missed releases made the same day). One small
+        # request each time; GitHub allows 60 an hour per computer without signing in.
         self._update_checking = False
         self._update_error = False
         self._update_retry_after = 0.0
         self.updateResultArrived.connect(self._apply_update_result)
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(lambda: self._maybe_check_updates(False))
-        self.update_timer.start(6 * 3600 * 1000)
+        self.update_timer.start(UPDATE_CHECK_EVERY_S * 1000)
         QTimer.singleShot(8000, lambda: self._maybe_check_updates(False))
 
     @staticmethod
@@ -1211,10 +1211,6 @@ class BridgeViewModel(QObject):
         if not force:
             if not self.updateCheckEnabled:
                 return
-            if time.time() - self._setting_float("updates/last_check") < UPDATE_CHECK_EVERY_S:
-                return
-            if time.time() < self._update_retry_after:
-                return
         self._update_checking = True
         self.updateChanged.emit()
 
@@ -1247,7 +1243,8 @@ class BridgeViewModel(QObject):
             self._settings.sync()
         else:
             self._update_error = True
-            self._update_retry_after = time.time() + 3600      # offline or GitHub busy: quietly try again in an hour
+            # offline or GitHub busy: quietly try again in an hour
+            QTimer.singleShot(3600 * 1000, lambda: self._maybe_check_updates(False))
         self.updateChanged.emit()
 
     @Slot()

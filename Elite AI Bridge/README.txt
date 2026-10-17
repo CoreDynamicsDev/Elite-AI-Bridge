@@ -1,4 +1,4 @@
-ELITE AI BRIDGE 2.0.2
+ELITE AI BRIDGE 2.0.3
 ======================
 
 Elite AI Bridge is an independent companion application for Elite Dangerous.

@@ -754,6 +754,76 @@ _QML_WARM_PHRASES = [
 class QmlVoiceWorker(legacy.VoiceSpeechWorker):
     """QML voice worker with cancellable speech and fast cold-start warm-up."""
 
+    # ---- 2.0.3: voice pitch without librosa ------------------------------------
+    # The .95 engine shifted pitch with librosa, which the installer never installs,
+    # so DEEP / VERY DEEP / HIGH silently did nothing. This does the same job with
+    # numpy only: WSOLA time-stretch (keeps pitch, changes length) followed by a
+    # resample back to the original length (changes pitch, restores length).
+    @staticmethod
+    def _wsola_stretch(x, alpha, sr):
+        import numpy as np
+        n_frame = max(256, int(0.040 * sr)) & ~1
+        hop_out = n_frame // 2
+        hop_in = hop_out / float(alpha)
+        tol = int(0.012 * sr)
+        win = np.hanning(n_frame).astype(np.float32)
+        xp = np.concatenate([np.zeros(n_frame + tol, np.float32), x.astype(np.float32),
+                             np.zeros(2 * n_frame + 2 * tol, np.float32)])
+        base = n_frame + tol
+        out_len = int(len(x) * alpha)
+        frames = out_len // hop_out + 2
+        y = np.zeros(frames * hop_out + n_frame, np.float32)
+        wsum = np.zeros_like(y)
+        prev = base
+        for k in range(frames):
+            nominal = base + int(round(k * hop_in))
+            pos = nominal
+            if k > 0:
+                template = xp[prev + hop_out: prev + hop_out + n_frame]
+                lo = max(0, nominal - tol)
+                seg = xp[lo: nominal + tol + n_frame]
+                if len(seg) >= n_frame and len(template) == n_frame and np.any(template):
+                    pos = lo + int(np.argmax(np.correlate(seg, template, mode="valid")))
+            if pos + n_frame > len(xp):
+                break
+            y[k * hop_out: k * hop_out + n_frame] += xp[pos: pos + n_frame] * win
+            wsum[k * hop_out: k * hop_out + n_frame] += win
+            prev = pos
+        wsum[wsum < 1e-3] = 1.0
+        return (y / wsum)[:out_len]
+
+    @staticmethod
+    def _apply_voice_pitch(wav, pitch="NORMAL", sample_rate=44100):
+        pitch = str(pitch or "NORMAL").strip().upper()
+        semitones = float(legacy.VoiceSpeechWorker.PITCH_SEMITONES.get(pitch, 0.0))
+        if abs(semitones) < 0.05:
+            return wav
+        try:
+            import numpy as np
+            arr = np.asarray(wav, dtype=np.float32)
+            if arr.size < 2048:
+                return wav
+            shape = arr.shape
+            sr = max(8000, int(sample_rate or 44100))
+            ratio = 2.0 ** (semitones / 12.0)
+            rows = []
+            for row in (arr.reshape((-1, shape[-1])) if arr.ndim > 1 else arr.reshape((1, -1))):
+                x = row.astype(np.float32, copy=True)
+                n = len(x)
+                st = QmlVoiceWorker._wsola_stretch(x, ratio, sr)
+                y = np.interp(np.linspace(0.0, len(st) - 1, n), np.arange(len(st)), st).astype(np.float32)
+                xr = float(np.sqrt(np.mean(x.astype(np.float64) ** 2) + 1e-12))
+                yr = float(np.sqrt(np.mean(y.astype(np.float64) ** 2) + 1e-12))
+                if xr > 1e-7 and yr > 1e-7:
+                    y *= xr / yr
+                peak = float(np.max(np.abs(y))) if y.size else 0.0
+                if peak > 0.96:
+                    y *= 0.96 / peak
+                rows.append(y)
+            return np.stack(rows, axis=0).reshape(shape)
+        except Exception:
+            return wav
+
     @staticmethod
     def _bridge_pronunciation_text(text):
         """Small spoken-only lexicon for Elite names the local TTS misreads."""

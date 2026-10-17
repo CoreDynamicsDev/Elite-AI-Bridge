@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.3 - 2026-10-17
+
+### Changed
+- Update check runs each time the Bridge starts and every 6 hours while it is open (was at
+  most once a day). The Setup > Status switch is now called CHECK FOR UPDATES.
+
+### Fixes
+- Voice pitch: DEEP, VERY DEEP and HIGH now work on installed copies (done with numpy, no
+  extra download).
+- Setup > Status on 1366x768: text no longer runs under the name box or the wizard switch.
+
 ## 2.0.2 - 2026-10-17
 
 ### New

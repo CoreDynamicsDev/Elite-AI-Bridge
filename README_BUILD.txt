@@ -1,15 +1,16 @@
-ELITE AI BRIDGE 2.0.2 - INSTALLER SOURCE
+ELITE AI BRIDGE 2.0.3 - INSTALLER SOURCE
 
-This source package contains the 2.0.2 build: the 2.0 retro redesign, setup wizard,
+This source package contains the 2.0.3 build: the 2.0 retro redesign, setup wizard,
 guided tours, in-game overlay and the Supertonic local voice, the 2.0.1 fixes
-(ELITE lamp at the main menu, old colony sites) and daily update notice, and the 2.0.2
-FLEET view on the Commander page (where your stored ships are). Python bytecode
+(ELITE lamp at the main menu, old colony sites) and update notice, the 2.0.2 FLEET view
+on the Commander page, and the 2.0.3 changes (update check on every start, working voice
+pitch, small-screen fixes on Setup > Status). Python bytecode
 caches are not part of the release source.
 
 COMPILE ON WINDOWS
 1. Install Inno Setup 6 if it is not already installed.
 2. Double-click BUILD_INSTALLER.bat.
-3. Finished installer: Output\Elite_AI_Bridge_Setup_2.0.2.exe
+3. Finished installer: Output\Elite_AI_Bridge_Setup_2.0.3.exe
 
 TEST BEFORE UPLOAD
 Install the generated EXE on a Windows user account that has never run the Bridge

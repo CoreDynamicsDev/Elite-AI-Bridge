@@ -173,7 +173,8 @@ Item {
             width: parent.width; height: sideCol.h1
             screwSize: 13 * st.s
             Dymo { x: 26 * st.s; y: 14 * st.s; text: "WHAT THE BRIDGE CALLS YOU" }
-            Blurb { x: 26 * st.s; y: 56 * st.s; width: parent.width - 52 * st.s
+            Blurb { x: 26 * st.s; y: 54 * st.s; width: parent.width - 52 * st.s
+                    visible: y + height <= nameBox.y + 2 * st.s      // hides on small screens rather than slide under the name box
                     text: "The ship's voice uses this when it talks to you, like \"Docking granted, " + (nameInput.text.trim() !== "" ? nameInput.text.trim() : "Commander") + ".\"" }
             Rectangle {
                 id: nameBox
@@ -211,12 +212,15 @@ Item {
             width: parent.width; height: sideCol.h2
             screwSize: 13 * st.s
             Dymo { x: 26 * st.s; y: 14 * st.s; text: "NEW TO THE BRIDGE?" }
-            Blurb { x: 26 * st.s; y: 56 * st.s; width: parent.width - 52 * st.s
+            Blurb { id: wizBlurb; x: 26 * st.s; y: 54 * st.s; width: parent.width - 52 * st.s
+                    visible: y + height <= wizRow.y + wizLabel.y + 2 * st.s      // hides on small screens rather than overprint the switch row
                     text: "The setup wizard sets up Elite, your voice and your keys. The tutorial tours every page." }
             Item {
+                id: wizRow
                 x: 26 * st.s; y: parent.height - height - 20 * st.s
                 width: parent.width - 52 * st.s; height: 50 * st.s
                 Text {
+                    id: wizLabel
                     anchors.verticalCenter: parent.verticalCenter; width: parent.width - wizRocker.width - 14 * st.s; wrapMode: Text.WordWrap
                     text: "SHOW THE SETUP WIZARD WHEN THE BRIDGE STARTS"
                     color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * st.s); font.letterSpacing: 2 * st.s
@@ -248,7 +252,7 @@ Item {
                 Text {
                     id: updLabel
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "CHECK DAILY"
+                    text: "CHECK FOR UPDATES"
                     color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * st.s); font.letterSpacing: 2 * st.s
                 }
                 OnOffPair {
@@ -281,7 +285,7 @@ Item {
                         width: notesFlick.width; wrapMode: Text.WordWrap; textFormat: Text.PlainText
                         text: updPlate.avail
                               ? (bridge.updateNotes !== "" ? "WHAT'S NEW\n" + String(bridge.updateNotes) : "WHAT'S NEW IS ON THE RELEASE PAGE.")
-                              : "ONCE A DAY THE BRIDGE ASKS GITHUB IF THERE IS A NEWER VERSION. IT NEVER DOWNLOADS OR INSTALLS ANYTHING BY ITSELF."
+                              : "EACH TIME IT STARTS, AND EVERY 6 HOURS WHILE OPEN, THE BRIDGE ASKS GITHUB IF THERE IS A NEWER VERSION. IT NEVER DOWNLOADS OR INSTALLS ANYTHING BY ITSELF."
                         color: updPlate.avail ? Theme.phosphor : Theme.dimText
                         font.family: Theme.crtFont; font.pixelSize: updPlate.fs * 0.8
                     }
