@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.4 - 2026-10-24
+
+### New
+- OLD SCHOOL AMBER screen theme: Setup > Display > SCREEN EFFECTS > THEME. Green stays the
+  default. Only the screens change (text, glass, grain, lists, ship art, shield, route map,
+  setup wizard, overlay and the opening animation); keys, lamps and plates stay the same.
+  Danger stays red, and heads-up messages turn yellow so they still stand out.
+- Startup sound: original sound effects timed to the opening animation, played at the
+  SOUND EFFECTS level. Switch it off in Setup > Sound (STARTUP SOUND), or hear it with the
+  STARTUP SOUND key.
+
+### Fixes
+- The setup wizard no longer starts talking while the opening animation is still playing.
+
 ## 2.0.3 - 2026-10-17
 
 ### Changed

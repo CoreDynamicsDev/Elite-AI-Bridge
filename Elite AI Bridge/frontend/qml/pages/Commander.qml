@@ -170,6 +170,8 @@ Item {
             }
             // dial
             Canvas {
+                property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                onThemeAmberChanged: requestPaint()
                 id: dial
                 x: 12 * tile.u; y: 40 * tile.u
                 width: Math.min(tile.iw * 0.36, 110 * tile.u); height: width
@@ -182,10 +184,10 @@ Item {
                     var c = getContext("2d"); c.reset()
                     var cx = width / 2, cy = height / 2, rr = width / 2 - 7 * tile.u
                     c.lineWidth = 9 * tile.u
-                    c.strokeStyle = "#163222"
+                    c.strokeStyle = Theme.t("#163222")
                     c.beginPath(); c.arc(cx, cy, rr, 0, Math.PI * 2); c.stroke()
                     // tick ring
-                    c.lineWidth = 1; c.strokeStyle = "#2a5a3a"
+                    c.lineWidth = 1; c.strokeStyle = Theme.t("#2a5a3a")
                     for (var i = 0; i < 20; i++) {
                         var a = i / 20 * Math.PI * 2
                         c.beginPath(); c.moveTo(cx + Math.cos(a) * (rr - 9 * tile.u), cy + Math.sin(a) * (rr - 9 * tile.u))
@@ -237,9 +239,9 @@ Item {
                            color: Theme.phosphor; font.family: Theme.crtFont; font.pixelSize: tile.fs * 0.7 }
                     Rectangle {
                         x: repLbl.width + 8 * tile.u; anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - x; height: 6 * tile.u; color: "#0a1a10"; border.color: "#337dff9c"; border.width: 1
+                        width: parent.width - x; height: 6 * tile.u; color: Theme.t("#0a1a10"); border.color: Theme.t("#337dff9c"); border.width: 1
                         // -100 .. +100, centre line at 0
-                        Rectangle { x: parent.width / 2; width: 1; height: parent.height; color: "#557dff9c" }
+                        Rectangle { x: parent.width / 2; width: 1; height: parent.height; color: Theme.t("#557dff9c") }
                         Rectangle {
                             readonly property real v: Math.max(-100, Math.min(100, Number(tile.r.rep || 0))) / 100
                             x: v >= 0 ? parent.width / 2 : parent.width / 2 * (1 + v); y: 1; height: parent.height - 2
@@ -266,9 +268,9 @@ Item {
                         x: index * (ladder.pw + 3 * tile.u) + (ladder.ef > 0 && index > ladder.ef ? ladder.gapW : 0)
                         y: tall ? 0 : 6 * tile.u
                         width: ladder.pw; height: tall ? 16 * tile.u : 10 * tile.u
-                        color: index < rk ? Theme.ok : (index === rk ? (tile.st === "max" ? Theme.ok : Theme.info) : "#163222")
+                        color: index < rk ? Theme.ok : (index === rk ? (tile.st === "max" ? Theme.ok : Theme.info) : Theme.t("#163222"))
                         opacity: index < rk ? 0.85 : 1
-                        border.color: "#0a140d"; border.width: 1
+                        border.color: Theme.t("#0a140d"); border.width: 1
                     }
                 }
                 Text { y: 19 * tile.u; text: String(tile.r.first || ""); color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: tile.fs * 0.55 }
@@ -296,6 +298,8 @@ Item {
                 id: holo
                 x: 0; y: 0; width: sBezel.iw * 0.5; height: sBezel.ih
                 Canvas {
+                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    onThemeAmberChanged: requestPaint()
                     id: stand
                     anchors.fill: parent
                     property real t: 0
@@ -307,7 +311,7 @@ Item {
                         var cx = width / 2, cy = height * 0.84
                         for (var i = 0; i < 3; i++) {
                             var rx = width * (0.42 - i * 0.11), ry = height * (0.075 - i * 0.02)
-                            c.strokeStyle = Qt.rgba(0.49, 1, 0.61, 0.22 + 0.12 * i); c.lineWidth = 1.2
+                            c.strokeStyle = Theme.t(Qt.rgba(0.49, 1, 0.61, 0.22 + 0.12 * i)); c.lineWidth = 1.2
                             c.beginPath(); c.ellipse(cx - rx, cy - ry, rx * 2, ry * 2); c.stroke()
                         }
                         // beam lines up from the base, gently scrolling
@@ -315,13 +319,13 @@ Item {
                             var fx = (k - 4) / 4
                             var bx = cx + fx * width * 0.3
                             var g2 = c.createLinearGradient(bx, cy, bx, height * 0.1)
-                            g2.addColorStop(0, Qt.rgba(0.49, 1, 0.61, 0.20))
-                            g2.addColorStop(1, Qt.rgba(0.49, 1, 0.61, 0))
+                            g2.addColorStop(0, Theme.t(Qt.rgba(0.49, 1, 0.61, 0.20)))
+                            g2.addColorStop(1, Theme.t(Qt.rgba(0.49, 1, 0.61, 0)))
                             c.strokeStyle = g2; c.lineWidth = 1
                             c.beginPath(); c.moveTo(bx, cy); c.lineTo(cx + fx * width * 0.38, height * 0.1); c.stroke()
                         }
                         var sy = cy - ((t % 1) * height * 0.7)
-                        c.strokeStyle = Qt.rgba(0.49, 1, 0.61, 0.18); c.lineWidth = 2
+                        c.strokeStyle = Theme.t(Qt.rgba(0.49, 1, 0.61, 0.18)); c.lineWidth = 2
                         c.beginPath(); c.moveTo(width * 0.14, sy); c.lineTo(width * 0.86, sy); c.stroke()
                     }
                     Timer { interval: 66; repeat: true; running: cm.visible; onTriggered: stand.t = (Date.now() % 4000) / 4000 }
@@ -561,7 +565,7 @@ Item {
                                text: String(modelData.value); color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 1.35 }
                         Text { y: oBezel.fs * 1.15; width: parent.width; elide: Text.ElideRight
                                text: String(modelData.note || ""); color: Theme.phosphor; opacity: 0.6; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.75 }
-                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * cm.s; width: parent.width; height: 1; color: "#227dff9c" }
+                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * cm.s; width: parent.width; height: 1; color: Theme.t("#227dff9c") }
                     }
                 }
             }
@@ -607,7 +611,7 @@ Item {
                                      + (modelData.hot ? " // HOT" : "")
                                color: modelData.hot ? Theme.info : Theme.phosphor; opacity: 0.7
                                font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.72 }
-                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 2 * cm.s; width: parent.width; height: 1; color: "#227dff9c" }
+                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 2 * cm.s; width: parent.width; height: 1; color: Theme.t("#227dff9c") }
                         MouseArea { id: fHover; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                     onClicked: cm.fleetSel = frow.picked ? -1 : Number(frow.modelData.shipId) }
                     }

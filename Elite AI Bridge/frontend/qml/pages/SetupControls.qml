@@ -76,9 +76,9 @@ Item {
         property real fs: Math.max(12, 23 * ct.s)
         signal clicked()
         radius: 3 * ct.s
-        color: flash === "ok" ? "#1e4a2a" : (flash === "bad" || bad ? "#2a0e0b" : (listening || waiting ? "#2a1e08" : (cellPress.containsMouse ? "#0f2a18" : "#07130b")))
+        color: flash === "ok" ? "#1e4a2a" : (flash === "bad" || bad ? "#2a0e0b" : (listening || waiting ? "#2a1e08" : (cellPress.containsMouse ? Theme.t("#0f2a18") : Theme.t("#07130b"))))
         border.width: listening || waiting || flash !== "" || bad ? 2 : 1
-        border.color: flash === "ok" ? Theme.ok : (flash === "bad" || bad ? Theme.bad : (listening || waiting ? Theme.info : (cellPress.containsMouse ? Theme.ok : "#2a5a38")))
+        border.color: flash === "ok" ? Theme.ok : (flash === "bad" || bad ? Theme.bad : (listening || waiting ? Theme.info : (cellPress.containsMouse ? Theme.ok : Theme.t("#2a5a38"))))
         Text {
             id: cellText
             anchors.fill: parent; anchors.leftMargin: 10 * ct.s; anchors.rightMargin: 10 * ct.s
@@ -270,7 +270,7 @@ Item {
                     width: eList.list.width - (eList.overflow ? 0 : 26 * ct.s)
                     height: eBezel.fs * 1.5
                     Rectangle { anchors.fill: parent; visible: parent.picked || ePress.containsMouse
-                                color: parent.picked ? "#2a7dff9c" : "#127dff9c"; border.color: parent.picked ? "#807dff9c" : "transparent"; border.width: 1 }
+                                color: parent.picked ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.picked ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                     Text { x: 6 * ct.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.48; elide: Text.ElideRight
                            text: (parent.picked ? "> " : "  ") + String(modelData.label)
                            color: parent.ready ? Theme.phosphor : Theme.info; font.family: Theme.crtFont; font.pixelSize: eBezel.fs }

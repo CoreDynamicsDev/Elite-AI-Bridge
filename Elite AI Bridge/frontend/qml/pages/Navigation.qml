@@ -189,11 +189,13 @@ Item {
 
                 // faint grid
                 Canvas {
+                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    onThemeAmberChanged: requestPaint()
                     id: grid
                     anchors.fill: parent; opacity: 0.5
                     onPaint: {
                         var c = getContext("2d"); c.reset()
-                        c.strokeStyle = "rgba(125,255,156,0.07)"; c.lineWidth = 1
+                        c.strokeStyle = "rgba(" + Theme.rgb("125,255,156") + ",0.07)"; c.lineWidth = 1
                         var st = Math.max(30, width / 16)
                         for (var x = 0; x < width; x += st) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, height); c.stroke() }
                         for (var y = 0; y < height; y += st) { c.beginPath(); c.moveTo(0, y); c.lineTo(width, y); c.stroke() }
@@ -202,6 +204,8 @@ Item {
                 }
                 // dashed links between node rims
                 Canvas {
+                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    onThemeAmberChanged: requestPaint()
                     id: links
                     anchors.fill: parent
                     onPaint: {
@@ -213,7 +217,7 @@ Item {
                             if (L < 2 * r) continue
                             var ux = dx / L, uy = dy / L
                             var nextEll = String(map.nodes[i + 1].kind) === "ELLIPSIS" || String(map.nodes[i].kind) === "ELLIPSIS"
-                            c.strokeStyle = String(map.nodes[i + 1].kind) === "INSYS" ? "rgba(255,184,77,0.55)" : (nextEll ? "rgba(125,255,156,0.28)" : "rgba(125,255,156,0.5)")
+                            c.strokeStyle = String(map.nodes[i + 1].kind) === "INSYS" ? "rgba(" + Theme.rgb("255,184,77") + ",0.55)" : (nextEll ? "rgba(" + Theme.rgb("125,255,156") + ",0.28)" : "rgba(" + Theme.rgb("125,255,156") + ",0.5)")
                             c.lineWidth = Math.max(1.5, 2.5 * nv.s)
                             var dash = 10 * nv.s, gap = 8 * nv.s
                             for (var d = r; d < L - r; d += dash + gap) {
@@ -276,7 +280,7 @@ Item {
                             visible: !node.isEll && !node.isIns
                             anchors.fill: parent
                             radius: node.isDest ? 4 * nv.s : width / 2
-                            color: "#5006140b"
+                            color: Theme.t("#5006140b")
                             border.color: node.c; border.width: Math.max(2, 3 * nv.s)
                             opacity: modelData.scoopable === null || modelData.scoopable === undefined ? 0.6 : 1
                             Rectangle {
@@ -296,7 +300,7 @@ Item {
                             visible: node.isIns
                             anchors.centerIn: parent
                             width: node.d * 0.62; height: width; rotation: 45
-                            color: "#5006140b"; border.color: Theme.info; border.width: Math.max(2, 3 * nv.s)
+                            color: Theme.t("#5006140b"); border.color: Theme.info; border.width: Math.max(2, 3 * nv.s)
                             Rectangle { anchors.centerIn: parent; width: parent.width * 0.28; height: width; color: Theme.info }
                         }
                         // ellipsis: "+N" with "MORE JUMPS" under it
@@ -368,7 +372,7 @@ Item {
                     ]
                     Rectangle {
                         width: (stats.width - stats.spacing * 4) / 5; height: stats.height
-                        color: "#0a9dffb6"; border.color: "#2a9dffb6"; border.width: 1
+                        color: Theme.t("#0a9dffb6"); border.color: Theme.t("#2a9dffb6"); border.width: 1
                         Text { x: 12 * nv.s; y: 4 * nv.s; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(10, 18 * nv.s); font.letterSpacing: 1.5 * nv.s }
                         Text {
                             x: 12 * nv.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * nv.s
@@ -417,8 +421,8 @@ Item {
                     readonly property bool dest: String(modelData.kind) === "DESTINATION"
                     readonly property bool chosen: nv.navSelected !== "" && String(modelData.system).toUpperCase() === nv.navSelected.toUpperCase()
                     Rectangle { anchors.fill: parent; visible: parent.cur || parent.chosen || rowArea.containsMouse
-                                color: parent.chosen ? "#2a7dff9c" : (parent.cur ? "#1a7dff9c" : "#107dff9c")
-                                border.color: parent.chosen ? "#807dff9c" : "#337dff9c"; border.width: 1 }
+                                color: parent.chosen ? Theme.t("#2a7dff9c") : (parent.cur ? Theme.t("#1a7dff9c") : Theme.t("#107dff9c"))
+                                border.color: parent.chosen ? Theme.t("#807dff9c") : Theme.t("#337dff9c"); border.width: 1 }
                     PressArea { id: rowArea; anchors.fill: parent; enabled: !nv.demo; onActivated: { Theme.cue("tick"); nv.pick(modelData.system) } }
                     Text { x: 6 * nv.s; anchors.verticalCenter: parent.verticalCenter; text: ("0" + (index + 1)).slice(-Math.max(2, String(index + 1).length))
                            color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: plan.fontSize }
@@ -477,13 +481,13 @@ Item {
                 id: field
                 x: 18 * nv.s; y: 38 * nv.s
                 width: destBezel.iw - 36 * nv.s; height: Math.max(30, 56 * nv.s)
-                color: "#0a7dff9c"; border.color: destInput.activeFocus ? "#807dff9c" : "#337dff9c"; border.width: 1
+                color: Theme.t("#0a7dff9c"); border.color: destInput.activeFocus ? Theme.t("#807dff9c") : Theme.t("#337dff9c"); border.width: 1
                 TextInput {
                     id: destInput
                     x: 12 * nv.s; width: parent.width - 24 * nv.s; height: parent.height
                     verticalAlignment: TextInput.AlignVCenter
                     text: nv.navDraft
-                    color: Theme.ok; selectionColor: "#2f7a45"; selectedTextColor: Theme.control
+                    color: Theme.ok; selectionColor: Theme.t("#2f7a45"); selectedTextColor: Theme.control
                     font.family: Theme.crtFont; font.pixelSize: Math.max(16, 38 * nv.s); font.letterSpacing: 2 * nv.s; font.capitalization: Font.AllUppercase
                     clip: true; selectByMouse: true
                     cursorDelegate: Rectangle {
@@ -523,8 +527,8 @@ Item {
                     Rectangle {
                         width: (picks.width - picks.columnSpacing) / 2; height: picks.rowH
                         readonly property bool chosen: nv.navSelected !== "" && String(modelData).toUpperCase() === nv.navSelected.toUpperCase()
-                        color: chosen ? "#2a7dff9c" : (pickArea.containsMouse ? "#167dff9c" : "transparent")
-                        border.color: chosen ? "#667dff9c" : "transparent"; border.width: 1
+                        color: chosen ? Theme.t("#2a7dff9c") : (pickArea.containsMouse ? Theme.t("#167dff9c") : "transparent")
+                        border.color: chosen ? Theme.t("#667dff9c") : "transparent"; border.width: 1
                         Text {
                             x: 8 * nv.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 16 * nv.s; elide: Text.ElideRight
                             text: (parent.chosen ? "> " : "  ") + String(modelData).toUpperCase()
@@ -592,7 +596,7 @@ Item {
             Item {
                 x: 20 * nv.s; width: insBezel.iw - 40 * nv.s; height: 30 * nv.s
                 y: insBezel.height - insBezel.pad * 2 - height - 10 * nv.s
-                Rectangle { width: parent.width; height: 1; color: "#337dff9c" }
+                Rectangle { width: parent.width; height: 1; color: Theme.t("#337dff9c") }
                 Text { y: 6 * nv.s; text: "MASS LOCK"; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(11, 22 * nv.s) }
                 Text {
                     anchors.right: parent.right; y: 6 * nv.s

@@ -22,6 +22,8 @@ Item {
     Rectangle { anchors.fill: parent; anchors.margins: sc.rim; radius: width / 2; border.color: "#000"; border.width: 1
         gradient: Gradient { GradientStop { position: 0; color: Theme.glassTop } GradientStop { position: 1; color: Theme.glassEdge } } }
     Canvas {
+        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+        onThemeAmberChanged: requestPaint()
         id: trace
         anchors.fill: parent; anchors.margins: sc.rim + 2
         property real tt: Math.round(sc.t * 30) / 30
@@ -34,7 +36,7 @@ Item {
                     var col = sc.col, rgb = Math.round(col.r * 255) + "," + Math.round(col.g * 255) + "," + Math.round(col.b * 255)
                     var ph = sc.t * Math.PI * 2 / 4
                     c.save(); c.beginPath(); c.arc(r, r, r - 1, 0, Math.PI * 2); c.clip()
-                    c.strokeStyle = "rgba(125,255,156,0.12)"; c.lineWidth = 1
+                    c.strokeStyle = "rgba(" + Theme.rgb("125,255,156") + ",0.12)"; c.lineWidth = 1
                     c.beginPath(); c.moveTo(0, r); c.lineTo(w, r); c.moveTo(r, 0); c.lineTo(r, h); c.stroke()
                     var alpha = 0.95
                     if (m === "CRITICAL") alpha = 0.45 + 0.5 * (0.5 + 0.5 * Math.sin(ph * 4))

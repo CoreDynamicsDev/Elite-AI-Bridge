@@ -91,8 +91,23 @@ Item {
         x: 0; y: winPlate.height + dp.g; width: dp.leftW; height: dp.bodyH - y
         screwSize: 13 * dp.s
         Dymo { x: 26 * dp.s; y: 14 * dp.s; text: "SCREEN EFFECTS" }
-        Blurb { id: fb; x: 26 * dp.s; y: 56 * dp.s; width: parent.width - 52 * dp.s
-                text: "The old-monitor look on the Bridge screens. Drag to preview, it saves when you let go. Both at 0 turns the effect off and saves GPU." }
+        // LAB themes: screen colour. Only the screens change; keys, lamps and plates stay.
+        Row {
+            id: themeRow
+            anchors.right: parent.right; anchors.rightMargin: 26 * dp.s; y: 12 * dp.s
+            spacing: 12 * dp.s
+            Text { anchors.verticalCenter: parent.verticalCenter; text: "THEME"; color: Theme.plateText; opacity: 0.8
+                   font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * dp.s); font.letterSpacing: 2 * dp.s }
+            SelectorRow {
+                readonly property var vals: ["GREEN", "AMBER"]
+                options: ["GREEN", "OLD SCHOOL AMBER"]
+                buttonWidth: 170 * dp.s; buttonHeight: 40 * dp.s
+                currentIndex: Math.max(0, vals.indexOf(String(bridge.screenTheme)))
+                onPicked: (i) => bridge.setScreenTheme(vals[i])
+            }
+        }
+        Blurb { id: fb; x: 26 * dp.s; y: 62 * dp.s; width: parent.width - 52 * dp.s
+                text: "The old-monitor look on the Bridge screens. THEME picks the screen colour. Drag the faders to preview, they save when you let go. Both at 0 turns the effect off and saves GPU." }
         Column {
             x: 26 * dp.s; y: fb.y + fb.height + 16 * dp.s
             width: parent.width - 52 * dp.s
@@ -113,7 +128,7 @@ Item {
                 onCommitted: (v) => bridge.setCrtLevel("screen_fx", Math.round(v), true)
             }
         }
-        Text { x: 26 * dp.s; y: parent.height - height - 16 * dp.s; text: "DEFAULT // STATIC 50 // SCREEN FX 80"
+        Text { x: 26 * dp.s; y: parent.height - height - 16 * dp.s; text: "DEFAULT // GREEN // STATIC 50 // SCREEN FX 80"
                color: Theme.plateText; opacity: 0.6; font.family: Theme.labelFont; font.pixelSize: Math.max(9, 13 * dp.s); font.letterSpacing: 1.5 * dp.s }
     }
 
@@ -251,7 +266,7 @@ Item {
             visible: true
             Rectangle {
                 anchors.fill: parent; radius: 22
-                color: "#ee050b07"; border.color: idWin.here ? Theme.ok : Theme.phosphor; border.width: 5
+                color: Theme.t("#ee050b07"); border.color: idWin.here ? Theme.ok : Theme.phosphor; border.width: 5
                 Text { anchors.horizontalCenter: parent.horizontalCenter; y: idWin.side * 0.07; text: "SCREEN"
                        color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: idWin.side * 0.12; font.letterSpacing: 6 }
                 Text { anchors.centerIn: parent; anchors.verticalCenterOffset: 14; text: String(idWin.index + 1)

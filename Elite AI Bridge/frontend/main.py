@@ -39,7 +39,7 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.3"
+APP_VERSION = "2.0.4"
 # 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
 # It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
 UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
@@ -370,10 +370,12 @@ class BridgeViewModel(QObject):
     systemInfoArrived = Signal(object, int)
     updateChanged = Signal()
     updateResultArrived = Signal(object)
+    bootSplashChanged = Signal()   # LAB: wizard voice waits for the boot splash
 
     def __init__(self, backend: BackendProcess):
         super().__init__()
         self.backend = backend
+        self._boot_splash_done = False   # LAB: set once the boot splash has fully faded
         self._started_mono = time.monotonic()
         self._activity_prev_owner = "NONE"
         self._activity_flash = None   # (kind, title, detail, until_mono)
@@ -804,6 +806,14 @@ class BridgeViewModel(QObject):
         # the backend acknowledges it (or a short timeout expires) so the buttons do not
         # flash back and forth while the setting is being saved.
         snapshot = dict(snapshot)
+        # LAB: cache the sound-effects level so the next boot splash plays at the same volume
+        try:
+            sfx_vol = snapshot.get("audioSfxVolume")
+            if sfx_vol is not None and int(sfx_vol) != getattr(self, "_cached_sfx_volume", None):
+                self._cached_sfx_volume = int(sfx_vol)
+                self._settings.setValue("audio/last_sfx_volume", int(sfx_vol))
+        except Exception:
+            pass
         pending = self._pending_voice_attention
         if pending:
             incoming = str(snapshot.get("voiceAttentionMode") or "").strip().upper()
@@ -1141,6 +1151,25 @@ class BridgeViewModel(QObject):
     def appVersion(self) -> str:
         return APP_VERSION
 
+    # LAB build marker (RUN_LAB.bat sets EAB_CHANNEL=LAB). Not part of appVersion,
+    # so the update check keeps comparing the real version number.
+    @Property(bool, constant=True)
+    def labBuild(self) -> bool:
+        return str(os.environ.get("EAB_CHANNEL", "")).strip().upper() == "LAB"
+
+    # Wizard voice timing (LAB, 2026-10-24): the first-run wizard used to start
+    # talking while the boot splash was still playing. QML waits for this.
+    @Property(bool, notify=bootSplashChanged)
+    def bootSplashDone(self) -> bool:
+        return bool(self._boot_splash_done)
+
+    @Slot()
+    def markBootSplashDone(self) -> None:
+        if self._boot_splash_done:
+            return
+        self._boot_splash_done = True
+        self.bootSplashChanged.emit()
+
     @Property(bool, notify=updateChanged)
     def updateCheckEnabled(self) -> bool:
         value = self._settings.value("updates/check_enabled", True)
@@ -1415,6 +1444,59 @@ class BridgeViewModel(QObject):
         else:
             self._crt_preview[kind] = value
         self.crtChanged.emit()
+
+    # ---- LAB: screen theme (Setup > Display > THEME) -------------------------------
+    # GREEN (default) or AMBER ("OLD SCHOOL AMBER"). Only the screen colour changes;
+    # Theme.qml does the colour work. Saved in QSettings display/screen_theme.
+    themeChanged = Signal()
+
+    @Property(str, notify=themeChanged)
+    def screenTheme(self) -> str:
+        try:
+            v = str(self._settings.value("display/screen_theme", "GREEN") or "GREEN").upper()
+        except Exception:
+            v = "GREEN"
+        return v if v in ("GREEN", "AMBER") else "GREEN"
+
+    @Slot(str)
+    def setScreenTheme(self, theme: str) -> None:
+        theme = str(theme or "").strip().upper()
+        if theme not in ("GREEN", "AMBER"):
+            theme = "GREEN"
+        if theme == self.screenTheme:
+            return
+        self._settings.setValue("display/screen_theme", theme)
+        self._settings.sync()
+        self.themeChanged.emit()
+
+    # ---- LAB: startup sound (boot splash) --------------------------------------------
+    # Played by boot_splash.py from its own QSettings read, before the backend is up, so
+    # it lives in the frontend settings. Volume follows the Bridge's sound-effects level
+    # (cached here from each backend snapshot as audio/last_sfx_volume).
+    startupSoundChanged = Signal()
+
+    @Property(bool, notify=startupSoundChanged)
+    def startupSoundEnabled(self) -> bool:
+        try:
+            v = self._settings.value("audio/startup_sound", True)
+            return str(v).strip().lower() not in ("false", "0", "no", "off")
+        except Exception:
+            return True
+
+    @Slot(bool)
+    def setStartupSoundEnabled(self, enabled: bool) -> None:
+        self._settings.setValue("audio/startup_sound", bool(enabled))
+        self._settings.sync()
+        self.startupSoundChanged.emit()
+
+    @Slot()
+    def testStartupSound(self) -> None:
+        """Play the startup sound now (Setup > Sound TEST key)."""
+        try:
+            from boot_splash import play_startup_preview
+            play_startup_preview(self)
+        except Exception as exc:
+            print(f"startup sound test failed: {exc}", file=sys.stderr)
 
     @Property(str, notify=displayChanged)
     def eliteOverlayCompatibility(self) -> str:
@@ -4136,6 +4218,13 @@ if __name__ == "__main__":
     # widget so a queued timeout cannot call methods on a deleted C++ object.
     splash.destroyed.connect(splash_stack_timer.stop)
     splash_stack_timer.start()
+
+    # Wizard voice timing (LAB): tell QML once the splash has squeezed to a dot and
+    # faded away, plus a short beat, so the wizard's first line starts on a clear
+    # screen. The splash closes itself (WA_DeleteOnClose), so destroyed fires then.
+    # Safety: never hold the wizard back longer than 40 s.
+    splash.destroyed.connect(lambda *_: QTimer.singleShot(500, vm.markBootSplashDone))
+    QTimer.singleShot(40000, vm.markBootSplashDone)
 
     exit_code = app.exec()
     splash_stack_timer.stop()

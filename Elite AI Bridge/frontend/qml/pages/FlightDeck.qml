@@ -180,7 +180,7 @@ Item {
                         model: deck.eliteLive || bridge.shipLoadoutKey.length > 0 ? bridge.shipLoadoutKey : []
                         Item {
                             width: mid.width; height: 50 * deck.s
-                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#2a9dffb6" }
+                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.t("#2a9dffb6") }
                             Text { anchors.verticalCenter: parent.verticalCenter; text: String(modelData.name); color: Theme.phosphor
                                    font.family: Theme.crtFont; font.pixelSize: Math.max(13, 30 * deck.s); font.letterSpacing: 1.5 * deck.s }
                             Row {
@@ -201,16 +201,18 @@ Item {
                     visible: mid.mode === "charge"
                     anchors.fill: parent
                     Canvas {
+                        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                        onThemeAmberChanged: requestPaint()
                         id: ring
                         width: Math.min(parent.width, parent.height * 0.80); height: width
                         anchors.horizontalCenter: parent.horizontalCenter
                         onPaint: {
                             var c = getContext("2d"); c.reset(); var r = width / 2 - 10 * deck.s
-                            c.lineWidth = 14 * deck.s; c.strokeStyle = "rgba(255,184,77,0.15)"
+                            c.lineWidth = 14 * deck.s; c.strokeStyle = "rgba(" + Theme.rgb("255,184,77") + ",0.15)"
                             c.beginPath(); c.arc(width / 2, height / 2, r, 0, Math.PI * 2); c.stroke()
                             for (var i = 0; i < 40; i++) {
                                 if (i / 40 >= mid.chargeK) break
-                                c.strokeStyle = "rgba(255,184,77," + (0.4 + 0.6 * i / 40) + ")"
+                                c.strokeStyle = "rgba(" + Theme.rgb("255,184,77") + "," + (0.4 + 0.6 * i / 40) + ")"
                                 var a0 = -Math.PI / 2 + i / 40 * Math.PI * 2, a1 = a0 + Math.PI * 2 / 40 * 0.75
                                 c.beginPath(); c.arc(width / 2, height / 2, r, a0, a1); c.stroke()
                             }
@@ -303,7 +305,7 @@ Item {
                         // small windows (720 to 800 tall): no room for REBUY above the status cells
                         visible: index === 0 || deck.s > 0.62
                         width: gauges.width; height: jr.height + 6 * deck.s
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#2a9dffb6" }
+                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.t("#2a9dffb6") }
                         Text { id: jr; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(12, 22 * deck.s); font.letterSpacing: 2 * deck.s }
                         Text { anchors.right: parent.right; text: modelData[1]; color: modelData[1] === "--" ? Theme.dimText : Theme.ok; font.family: Theme.crtFont; font.pixelSize: Math.max(13, 28 * deck.s) }
                     }
@@ -325,7 +327,7 @@ Item {
                     ]
                     Rectangle {
                         width: (cells.width - cells.spacing * 3) / 4; height: cells.height
-                        color: "#0a9dffb6"; border.color: "#2a9dffb6"; border.width: 1
+                        color: Theme.t("#0a9dffb6"); border.color: Theme.t("#2a9dffb6"); border.width: 1
                         Text { x: 12 * deck.s; y: 4 * deck.s; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(10, 18 * deck.s); font.letterSpacing: 1.5 * deck.s }
                         Text {
                             x: 12 * deck.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * deck.s

@@ -78,7 +78,7 @@ Item {
                 height: dlist.fontSize * 1.45
                 readonly property bool inUse: String(modelData) === dl.shown || (so.isDefault(modelData) && so.isDefault(dl.shown))
                 Rectangle { anchors.fill: parent; visible: parent.inUse || dPress.containsMouse
-                            color: parent.inUse ? "#2a7dff9c" : "#127dff9c"; border.color: parent.inUse ? "#807dff9c" : "transparent"; border.width: 1 }
+                            color: parent.inUse ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.inUse ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                 Text {
                     x: 6 * so.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 120 * so.s; elide: Text.ElideRight
                     text: (parent.inUse ? "> " : "  ") + (so.isDefault(modelData) ? "WINDOWS DEFAULT" + (dl.winDefault !== "" ? " (" + dl.winDefault + ")" : "") : String(modelData)).toUpperCase()
@@ -123,8 +123,22 @@ Item {
         x: so.leftW + so.g; y: 0; width: so.width - x; height: so.bodyH * 0.36
         screwSize: 13 * so.s
         Dymo { x: 26 * so.s; y: 14 * so.s; text: "LEVELS" }
-        Blurb { id: lb; x: 26 * so.s; y: 56 * so.s; width: parent.width - 52 * so.s - masterBox.width
+        Blurb { id: lb; x: 26 * so.s; y: 56 * so.s; width: parent.width - 52 * so.s - masterBox.width - startBox.width - 30 * so.s
                 text: "Drag to set; it saves when you let go." }
+        // LAB: startup sound (boot splash). Saved in the frontend settings; takes effect next launch.
+        Item {
+            id: startBox
+            anchors.right: masterBox.left; anchors.rightMargin: 30 * so.s; y: 46 * so.s
+            width: startLbl.width + startRk.width + 16 * so.s; height: 46 * so.s
+            Label2 { id: startLbl; anchors.verticalCenter: parent.verticalCenter; text: "STARTUP SOUND" }
+            OnOffPair {
+                id: startRk
+                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                buttonWidth: 70 * so.s; buttonHeight: 42 * so.s
+                on: bridge.startupSoundEnabled
+                onChanged: (v) => bridge.setStartupSoundEnabled(v)
+            }
+        }
         Item {
             id: masterBox
             anchors.right: parent.right; anchors.rightMargin: 26 * so.s; y: 46 * so.s
@@ -186,8 +200,8 @@ Item {
                     width: sfxCol.width; height: sfxCol.rh
                     readonly property bool isPicked: modelData.key === so.pickKey
                     Rectangle { anchors.fill: parent; anchors.rightMargin: rk.width + 12 * so.s; radius: 4 * so.s
-                                color: parent.isPicked ? "#3346ff82" : (rowPress.containsMouse ? "#1846ff82" : "transparent")
-                                border.color: parent.isPicked ? "#8046ff82" : "transparent"; border.width: 1 }
+                                color: parent.isPicked ? Theme.t("#3346ff82") : (rowPress.containsMouse ? Theme.t("#1846ff82") : "transparent")
+                                border.color: parent.isPicked ? Theme.t("#8046ff82") : "transparent"; border.width: 1 }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#3a3730"; opacity: 0.6 }
                     Text {
                         x: 10 * so.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width - rk.width - 30 * so.s; elide: Text.ElideRight
@@ -240,6 +254,13 @@ Item {
                 tooltip: "HEAR THE PICKED SOUND"; tooltipDetail: "PLAYS EVEN IF IT'S SWITCHED OFF"
                 onActivated: bridge.testSfxEvent(so.pickKey)
                 onDenied: (r) => so.denied("NOTHING PICKED", r)
+            }
+            DeckKey {
+                id: startKey
+                width: deck.keyW * 1.15; height: deck.keyH
+                title: "STARTUP SOUND"; legend: "HEAR IT"
+                tooltip: "PLAY THE STARTUP SOUND"; tooltipDetail: "THE SOUND THAT PLAYS WITH THE OPENING ANIMATION"
+                onActivated: bridge.testStartupSound()
             }
             Groove { width: deck.divW; height: deck.keyH }
             DeckKey {

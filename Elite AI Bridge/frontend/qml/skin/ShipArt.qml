@@ -37,7 +37,7 @@ Item {
         x: (art.width - img.paintedWidth) / 2; y: (art.height - img.paintedHeight) / 2
         width: img.paintedWidth; height: img.paintedHeight
         property variant src: img
-        property color tint: Theme.ok
+        property color tint: Theme.screen   // LAB themes: ship art follows the screen colour
         property color alarm: Theme.bad
         property real alarmAmt: art.alarm
         property real lo: 0.10

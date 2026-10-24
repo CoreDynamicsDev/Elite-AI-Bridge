@@ -49,13 +49,15 @@ Item {
         property color edge: "#4a4c44"
         property color tint: ov.col
         Rectangle { anchors.fill: parent; radius: 6 * ov.f; opacity: ov.see
-            gradient: Gradient { GradientStop { position: 0; color: "#0b1a10" } GradientStop { position: 1; color: "#030805" } }
+            gradient: Gradient { GradientStop { position: 0; color: Theme.t("#0b1a10") } GradientStop { position: 1; color: Theme.t("#030805") } }
             border.color: g.edge; border.width: 1 }
         Rectangle { anchors.fill: parent; anchors.margins: 2; radius: 5 * ov.f; color: "transparent"
             border.color: g.tint; border.width: 1; opacity: 0.30 * ov.see + 0.1 }
         Rectangle { x: 0; y: 6 * ov.f; width: Math.max(3, 5 * ov.f); height: parent.height - 12 * ov.f; radius: 2; color: g.tint; opacity: 0.9 }
         // scanlines
         Canvas {
+            property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+            onThemeAmberChanged: requestPaint()
             anchors.fill: parent; anchors.margins: 2; opacity: 0.5
             onPaint: { var c = getContext("2d"); c.reset(); c.fillStyle = "rgba(0,0,0,0.22)"
                        for (var y = 0; y < height; y += 3) c.fillRect(0, y, width, 1) }

@@ -200,6 +200,8 @@ Item {
                     // amber shield ring: back half behind the ship, front half over it.
                     // The lit arc (target shield %) orbits once every 24 s.
                     Canvas {
+                        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                        onThemeAmberChanged: requestPaint()
                         id: ringBack
                         anchors.fill: parent
                         visible: cb.tPresent
@@ -231,6 +233,8 @@ Item {
                         line3: ""
                     }
                     Canvas {
+                        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                        onThemeAmberChanged: requestPaint()
                         id: ringFront
                         anchors.fill: parent
                         visible: cb.tPresent
@@ -249,7 +253,7 @@ Item {
                             // position along the full ring relative to the orbiting start (0..1)
                             var p = ((a / (2 * Math.PI)) - scope.th / (2 * Math.PI) + 2) % 1
                             var on = p < scope.lit
-                            var rgb = scope.done ? "125,255,156" : "255,184,77"
+                            var rgb = scope.done ? Theme.rgb("125,255,156") : Theme.rgb("255,184,77")
                             c.strokeStyle = on ? "rgba(" + rgb + "," + (front ? 0.95 : 0.55) + ")" : "rgba(" + rgb + "," + (front ? 0.16 : 0.10) + ")"
                             c.lineWidth = on ? Math.max(2, 4 * cb.s) : Math.max(1, 2 * cb.s)
                             c.beginPath()
@@ -336,7 +340,7 @@ Item {
                             ]
                             Rectangle {
                                 width: (tdata.width - 16 * cb.s) * modelData[3]; height: parent.height
-                                color: "#0a9dffb6"; border.color: index === 1 && cb.tPresent && cb.tBounty !== "-" ? "#667dff9c" : "#2a9dffb6"; border.width: 1
+                                color: Theme.t("#0a9dffb6"); border.color: index === 1 && cb.tPresent && cb.tBounty !== "-" ? Theme.t("#667dff9c") : Theme.t("#2a9dffb6"); border.width: 1
                                 Text { x: 10 * cb.s; y: 4 * cb.s; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(9, 16 * cb.s) }
                                 Text {
                                     x: 10 * cb.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * cb.s
@@ -360,7 +364,7 @@ Item {
                             Repeater {
                                 model: 4
                                 Rectangle { width: 30 * cb.s; height: 14 * cb.s; anchors.verticalCenter: parent.verticalCenter
-                                            color: index < parent.parent.tc[0] ? parent.parent.tc[2] : "#1a9dffb6"; border.color: "#339dffb6"; border.width: 1 }
+                                            color: index < parent.parent.tc[0] ? parent.parent.tc[2] : Theme.t("#1a9dffb6"); border.color: Theme.t("#339dffb6"); border.width: 1 }
                             }
                         }
                         Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: parent.tc[1]; color: parent.tc[2]
@@ -378,8 +382,8 @@ Item {
                             ]
                             Rectangle {
                                 width: (tdata.width - 16 * cb.s) * modelData[3]; height: parent.height
-                                color: index === 1 && odo.rolling ? "#227dff9c" : "#0a9dffb6"
-                                border.color: index === 1 && odo.rolling ? "#997dff9c" : "#2a9dffb6"; border.width: 1
+                                color: index === 1 && odo.rolling ? Theme.t("#227dff9c") : Theme.t("#0a9dffb6")
+                                border.color: index === 1 && odo.rolling ? Theme.t("#997dff9c") : Theme.t("#2a9dffb6"); border.width: 1
                                 Behavior on color { ColorAnimation { duration: 400 } }
                                 Text { x: 10 * cb.s; y: 4 * cb.s; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(9, 16 * cb.s) }
                                 Text {
@@ -412,7 +416,7 @@ Item {
                                 Item {
                                     width: tdata.width; height: sweepCol.rowH
                                     readonly property bool legalWanted: String(modelData.legal) === "WANTED"
-                                    Rectangle { anchors.fill: parent; visible: modelData.best; color: "#227dff9c"; border.color: "#667dff9c"; border.width: 1 }
+                                    Rectangle { anchors.fill: parent; visible: modelData.best; color: Theme.t("#227dff9c"); border.color: Theme.t("#667dff9c"); border.width: 1 }
                                     Text { x: 6 * cb.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.55; elide: Text.ElideRight
                                            text: (modelData.best ? "> " : "  ") + cb.nice(modelData.ship) + (String(modelData.pilot) !== "-" && String(modelData.pilot) !== "" ? "  " + cb.nice(modelData.pilot) : "")
                                            color: modelData.best ? Theme.ok : (modelData.eligible ? Theme.phosphor : Theme.dimText); font.family: Theme.crtFont; font.pixelSize: Math.max(10, 20 * cb.s) }
@@ -467,7 +471,7 @@ Item {
                             ]
                             Rectangle {
                                 width: (ownGrid.width - ownGrid.columnSpacing * 2) / 3; height: (ownGrid.height - ownGrid.rowSpacing) / 2
-                                color: "#0a9dffb6"; border.color: "#2a9dffb6"; border.width: 1
+                                color: Theme.t("#0a9dffb6"); border.color: Theme.t("#2a9dffb6"); border.width: 1
                                 Text { x: 10 * cb.s; y: 4 * cb.s; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(9, 17 * cb.s) }
                                 Text {
                                     x: 10 * cb.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * cb.s
@@ -775,7 +779,7 @@ Item {
                                 spacing: 3 * cb.s
                                 Repeater {
                                     model: 4
-                                    Rectangle { width: 16 * cb.s; height: 12 * cb.s; color: index < ladRow.level ? Theme.info : "#1a9dffb6"; border.color: "#33ffb84d"; border.width: 1 }
+                                    Rectangle { width: 16 * cb.s; height: 12 * cb.s; color: index < ladRow.level ? Theme.info : Theme.t("#1a9dffb6"); border.color: Theme.t("#33ffb84d"); border.width: 1 }
                                 }
                             }
                             Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: modelData[3]; color: modelData[4]; font.family: Theme.crtFont; font.pixelSize: lad.fs }
@@ -860,7 +864,7 @@ Item {
                         readonly property bool chosen: index === hunting.selected
                         readonly property var dz: hunting.danger(modelData.type)
                         Rectangle { anchors.fill: parent; visible: parent.chosen || rowPress.containsMouse
-                                    color: parent.chosen ? "#2a7dff9c" : "#127dff9c"; border.color: parent.chosen ? "#807dff9c" : "transparent"; border.width: 1 }
+                                    color: parent.chosen ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.chosen ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                         Text { x: 4 * cb.s; anchors.verticalCenter: parent.verticalCenter; text: (parent.chosen ? ">" : " ") + ("0" + (index + 1)).slice(-2); color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: sites.fontSize }
                         Text { x: parent.width * siteBezel.cx[1]; anchors.verticalCenter: parent.verticalCenter; text: parent.dz[0]; color: parent.dz[1]; font.family: Theme.crtFont; font.pixelSize: sites.fontSize }
                         Text { x: parent.width * siteBezel.cx[2]; width: parent.width * 0.2; elide: Text.ElideRight; anchors.verticalCenter: parent.verticalCenter
@@ -889,7 +893,7 @@ Item {
                     visible: hunting.thin
                     x: 20 * cb.s; width: siteBezel.iw - 40 * cb.s; height: thinRow.height + 16 * cb.s
                     y: hunting.rows.length === 0 ? sites.y + sites.height * 0.35 + siteBezel.fs * 2.2 : siteBezel.ih * 0.66 - height - 6 * cb.s
-                    radius: 4 * cb.s; color: "#1a1406"; border.color: "#66ffb84d"; border.width: 1
+                    radius: 4 * cb.s; color: Theme.t("#1a1406"); border.color: Theme.t("#66ffb84d"); border.width: 1
                     Row {
                         id: thinRow
                         anchors.centerIn: parent; spacing: 16 * cb.s
@@ -915,7 +919,7 @@ Item {
                     width: siteBezel.iw - 40 * cb.s
                     spacing: 4 * cb.s
                     visible: hunting.sel !== null
-                    Rectangle { width: parent.width; height: 1; color: "#337dff9c" }
+                    Rectangle { width: parent.width; height: 1; color: Theme.t("#337dff9c") }
                     Text { text: "SELECTED"; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: siteBezel.fs * 0.75 }
                     Text {
                         width: parent.width; elide: Text.ElideRight

@@ -117,14 +117,14 @@ Item {
         property string cur: ""
         signal picked(string v)
         spacing: 22 * wz.s
-        Text { width: 120 * wz.s; text: cp.label; color: "#bfffd0"; opacity: 0.6; font.family: Theme.crtFont; font.pixelSize: 32 * wz.s }
+        Text { width: 120 * wz.s; text: cp.label; color: Theme.t("#bfffd0"); opacity: 0.6; font.family: Theme.crtFont; font.pixelSize: 32 * wz.s }
         Repeater {
             model: cp.opts
             delegate: Text {
                 required property var modelData
                 readonly property bool on: String(modelData) === cp.cur
                 text: on ? "[" + modelData + "]" : " " + modelData + " "
-                color: on ? Theme.ok : (pka.containsMouse ? "#ffffff" : "#bfffd0"); opacity: on ? 1 : 0.75
+                color: on ? Theme.ok : (pka.containsMouse ? "#ffffff" : Theme.t("#bfffd0")); opacity: on ? 1 : 0.75
                 font.family: Theme.crtFont; font.pixelSize: 32 * wz.s
                 PressArea { id: pka; anchors.fill: parent; anchors.margins: -6 * wz.s; onActivated: { cp.picked(String(modelData)); bridge.playUiCue("nav") } }
             }
@@ -350,19 +350,19 @@ Item {
                        font.family: Theme.crtFont; font.pixelSize: 40 * wz.s }
                 Item { width: 1; height: 16 * wz.s }
                 Text { width: parent.width; text: wz.screen.big || ""; wrapMode: Text.WordWrap
-                       color: wz.screen.bigAmber ? "#ffcf6e" : "#bfffd0"; lineHeight: 0.95
+                       color: wz.screen.bigAmber ? Theme.t("#ffcf6e") : Theme.t("#bfffd0"); lineHeight: 0.95
                        font.family: Theme.crtFont; font.pixelSize: (String(wz.screen.big || "").length > 34 ? 72 : 88) * wz.s }
                 // name field
                 Item { width: 1; height: wz.screen.input ? 34 * wz.s : 0; visible: !!wz.screen.input }
                 Rectangle {
                     visible: !!wz.screen.input
                     width: 900 * wz.s; height: visible ? 96 * wz.s : 0
-                    color: "#061309"; border.color: Qt.rgba(0.62, 1, 0.71, 0.6); border.width: 2
+                    color: Theme.t("#061309"); border.color: Theme.t(Qt.rgba(0.62, 1, 0.71, 0.6)); border.width: 2
                     TextInput {
                         id: nameInput
                         anchors.fill: parent; anchors.leftMargin: 24 * wz.s; anchors.rightMargin: 24 * wz.s
                         verticalAlignment: TextInput.AlignVCenter
-                        color: "#bfffd0"; font.family: Theme.crtFont; font.pixelSize: 70 * wz.s
+                        color: Theme.t("#bfffd0"); font.family: Theme.crtFont; font.pixelSize: 70 * wz.s
                         maximumLength: 40; selectByMouse: true; clip: true
                         cursorDelegate: Rectangle { width: 26 * wz.s; color: Theme.ok
                             SequentialAnimation on opacity { loops: Animation.Infinite; NumberAnimation { to: 0; duration: 500 } NumberAnimation { to: 1; duration: 500 } } }
@@ -371,9 +371,9 @@ Item {
                 }
                 Item { width: 1; height: wz.screen.line ? 24 * wz.s : 0 }
                 Text { width: parent.width; visible: !!wz.screen.line; text: wz.screen.line || ""; wrapMode: Text.WordWrap
-                       color: "#bfffd0"; opacity: 0.85; lineHeight: 1.05; font.family: Theme.crtFont; font.pixelSize: 44 * wz.s }
+                       color: Theme.t("#bfffd0"); opacity: 0.85; lineHeight: 1.05; font.family: Theme.crtFont; font.pixelSize: 44 * wz.s }
                 Text { width: parent.width; visible: !!wz.screen.sub; text: wz.screen.sub || ""; wrapMode: Text.WordWrap
-                       color: "#bfffd0"; opacity: 0.7; font.family: Theme.crtFont; font.pixelSize: 40 * wz.s }
+                       color: Theme.t("#bfffd0"); opacity: 0.7; font.family: Theme.crtFont; font.pixelSize: 40 * wz.s }
                 // BRIDGE SCREEN (2.0.0): one tile per screen; click moves the Bridge there and shows the numbers
                 Item { width: 1; height: wz.screen.bridgeScreens ? 30 * wz.s : 0 }
                 Row {
@@ -388,11 +388,11 @@ Item {
                             readonly property bool here: index === wz.bridgeScreen
                             readonly property var row: (bridge.monitorRows || [])[index]
                             width: Math.min(380 * wz.s, (body.width - 20 * wz.s * (Math.min(4, wz.screenCount) - 1)) / Math.min(4, wz.screenCount)); height: 150 * wz.s
-                            radius: 6 * wz.s; color: here ? Qt.rgba(0.49, 1, 0.61, 0.12) : Qt.rgba(0, 0, 0, 0.3)
-                            border.color: here ? Theme.ok : (bpa.containsMouse ? "#bfffd0" : "#3a3c36"); border.width: here ? 3 : 2
-                            Text { x: 18 * wz.s; y: 10 * wz.s; text: "SCREEN " + (btile.index + 1); color: btile.here ? Theme.ok : "#bfffd0"
+                            radius: 6 * wz.s; color: here ? Theme.t(Qt.rgba(0.49, 1, 0.61, 0.12)) : Qt.rgba(0, 0, 0, 0.3)
+                            border.color: here ? Theme.ok : (bpa.containsMouse ? Theme.t("#bfffd0") : "#3a3c36"); border.width: here ? 3 : 2
+                            Text { x: 18 * wz.s; y: 10 * wz.s; text: "SCREEN " + (btile.index + 1); color: btile.here ? Theme.ok : Theme.t("#bfffd0")
                                    font.family: Theme.crtFont; font.pixelSize: 46 * wz.s }
-                            Text { x: 18 * wz.s; y: 66 * wz.s; text: btile.row ? String(btile.row.size) : ""; color: "#bfffd0"; opacity: 0.6
+                            Text { x: 18 * wz.s; y: 66 * wz.s; text: btile.row ? String(btile.row.size) : ""; color: Theme.t("#bfffd0"); opacity: 0.6
                                    font.family: Theme.crtFont; font.pixelSize: 28 * wz.s }
                             Text { x: 18 * wz.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 10 * wz.s
                                    text: btile.here ? "● BRIDGE IS HERE" : "CLICK TO MOVE HERE"; color: btile.here ? Theme.ok : Theme.info; opacity: btile.here ? 1 : 0.8
@@ -414,6 +414,8 @@ Item {
                         width: 600 * wz.s; height: 300 * wz.s
                         color: "#020306"; border.color: "#3a3c36"; border.width: 2; clip: true
                         Canvas {
+                            property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                            onThemeAmberChanged: requestPaint()
                             anchors.fill: parent
                             onPaint: {
                                 var c = getContext("2d"); var seed = 11
@@ -457,14 +459,14 @@ Item {
                                     readonly property bool picked: scr === wz.ovScreen
                                     readonly property var row: (bridge.monitorRows || [])[scr]
                                     width: (parent.parent.width - 12 * wz.s) / 2; height: 80 * wz.s
-                                    radius: 6 * wz.s; color: picked ? Qt.rgba(0.49, 1, 0.61, 0.12) : Qt.rgba(0, 0, 0, 0.3)
-                                    border.color: picked ? Theme.ok : (tpa.containsMouse ? "#bfffd0" : "#3a3c36"); border.width: picked ? 3 : 2
+                                    radius: 6 * wz.s; color: picked ? Theme.t(Qt.rgba(0.49, 1, 0.61, 0.12)) : Qt.rgba(0, 0, 0, 0.3)
+                                    border.color: picked ? Theme.ok : (tpa.containsMouse ? Theme.t("#bfffd0") : "#3a3c36"); border.width: picked ? 3 : 2
                                     Text { x: 14 * wz.s; y: 6 * wz.s; width: parent.width - 28 * wz.s; elide: Text.ElideRight
-                                           text: tile.same ? "SAME AS BRIDGE" : "SCREEN " + (tile.scr + 1); color: tile.picked ? Theme.ok : "#bfffd0"
+                                           text: tile.same ? "SAME AS BRIDGE" : "SCREEN " + (tile.scr + 1); color: tile.picked ? Theme.ok : Theme.t("#bfffd0")
                                            font.family: Theme.crtFont; font.pixelSize: (tile.same ? 30 : 36) * wz.s }
                                     Text { x: 14 * wz.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 6 * wz.s; width: parent.width - 28 * wz.s; elide: Text.ElideRight
                                            text: tile.same ? "ELITE WINDOWED BESIDE IT" : (tile.row ? String(tile.row.size) : "")
-                                           color: "#bfffd0"; opacity: 0.6; font.family: Theme.crtFont; font.pixelSize: 22 * wz.s }
+                                           color: Theme.t("#bfffd0"); opacity: 0.6; font.family: Theme.crtFont; font.pixelSize: 22 * wz.s }
                                     PressArea { id: tpa; anchors.fill: parent
                                         onActivated: { wz.ovScreen = tile.scr; bridge.setGameOverlayScreen(tile.scr); bridge.playUiCue("nav") } }
                                 }
@@ -472,7 +474,7 @@ Item {
                         }
                         Text { width: parent.width; visible: wz.screenCount < 2; wrapMode: Text.WordWrap
                                text: "ONE SCREEN: IT SITS OVER THE GAME. WHEN THE BRIDGE IS IN FRONT IT STEPS ASIDE."
-                               color: "#bfffd0"; opacity: 0.8; font.family: Theme.crtFont; font.pixelSize: 32 * wz.s }
+                               color: Theme.t("#bfffd0"); opacity: 0.8; font.family: Theme.crtFont; font.pixelSize: 32 * wz.s }
                         Item { width: 1; height: 4 * wz.s }
                         CrtPick { label: "SIDE"; opts: ["LEFT", "CENTER", "RIGHT"]; cur: String(bridge.gameOverlayLayout || "RIGHT")
                                   onPicked: (v) => { bridge.setGameOverlayLayout(v); bridge.setGameOverlayPosition(v) } }
@@ -494,7 +496,7 @@ Item {
                             readonly property bool cur: String(modelData) === String(bridge.voiceOutputDevice)
                             width: parent.width; elide: Text.ElideRight
                             text: (cur ? "> " : "  ") + String(modelData).toUpperCase()
-                            color: pa.containsMouse ? "#ffffff" : (cur ? Theme.ok : "#bfffd0")
+                            color: pa.containsMouse ? "#ffffff" : (cur ? Theme.ok : Theme.t("#bfffd0"))
                             font.family: Theme.crtFont; font.pixelSize: 42 * wz.s
                             PressArea { id: pa; anchors.fill: parent
                                 onActivated: { bridge.setAudioDevice("output", String(modelData)); wz.pickingOutput = false; voiceTestDelay.restart() } }
@@ -507,14 +509,14 @@ Item {
                     id: keyBox
                     visible: !!wz.screen.keyinput
                     width: Math.min(parent.width, 1150 * wz.s); height: visible ? 96 * wz.s : 0
-                    color: "#061309"; border.color: keyInput.activeFocus ? Theme.ok : Qt.rgba(0.62, 1, 0.71, 0.6); border.width: keyInput.activeFocus ? 3 : 2
+                    color: Theme.t("#061309"); border.color: keyInput.activeFocus ? Theme.ok : Theme.t(Qt.rgba(0.62, 1, 0.71, 0.6)); border.width: keyInput.activeFocus ? 3 : 2
                     TextInput {
                         id: keyInput
                         objectName: "wizardKeyInput"
                         anchors.left: parent.left; anchors.right: showBtn.visible ? showBtn.left : parent.right
                         anchors.leftMargin: 24 * wz.s; anchors.rightMargin: 16 * wz.s
                         anchors.verticalCenter: parent.verticalCenter
-                        color: "#bfffd0"; font.family: Theme.crtFont; font.pixelSize: 48 * wz.s
+                        color: Theme.t("#bfffd0"); font.family: Theme.crtFont; font.pixelSize: 48 * wz.s
                         echoMode: wz.showKey ? TextInput.Normal : TextInput.Password
                         passwordCharacter: "•"
                         maximumLength: 400; selectByMouse: true; clip: true
@@ -524,7 +526,7 @@ Item {
                         cursorDelegate: Rectangle { width: 20 * wz.s; color: Theme.ok; visible: keyInput.activeFocus
                             SequentialAnimation on opacity { loops: Animation.Infinite; NumberAnimation { to: 0; duration: 500 } NumberAnimation { to: 1; duration: 500 } } }
                         Text { x: 34 * wz.s; anchors.verticalCenter: parent.verticalCenter; visible: keyInput.text === ""
-                               text: "CLICK HERE, THEN CTRL+V TO PASTE YOUR KEY"; color: "#bfffd0"; opacity: 0.35
+                               text: "CLICK HERE, THEN CTRL+V TO PASTE YOUR KEY"; color: Theme.t("#bfffd0"); opacity: 0.35
                                font.family: Theme.crtFont; font.pixelSize: 38 * wz.s }
                     }
                     // right-click pastes, like a terminal (there is no menu on this box)
@@ -540,21 +542,21 @@ Item {
                     }
                 }
                 Text { width: parent.width; visible: !!wz.screen.saved; text: wz.screen.saved || ""; topPadding: 12 * wz.s
-                       color: "#bfffd0"; opacity: 0.55; font.family: Theme.crtFont; font.pixelSize: 30 * wz.s }
+                       color: Theme.t("#bfffd0"); opacity: 0.55; font.family: Theme.crtFont; font.pixelSize: 30 * wz.s }
                 Text { width: parent.width; visible: !!(wz.screen.status && wz.screen.status.t); text: wz.screen.status ? wz.screen.status.t : ""
                        wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
-                       color: !wz.screen.status ? Theme.ok : (wz.screen.status.c === "ok" ? Theme.ok : (wz.screen.status.c === "bad" ? Theme.bad : "#ffcf6e"))
+                       color: !wz.screen.status ? Theme.ok : (wz.screen.status.c === "ok" ? Theme.ok : (wz.screen.status.c === "bad" ? Theme.bad : Theme.t("#ffcf6e")))
                        font.family: Theme.crtFont; font.pixelSize: 38 * wz.s; topPadding: 16 * wz.s }
                 // PTT: what the Bridge heard
                 Text { width: parent.width; visible: !!wz.screen.heardLine; topPadding: 22 * wz.s
                        textFormat: Text.StyledText
                        text: wz.heardOk ? "I HEARD: <font color='#ffffff'>\"" + wz.heard.toUpperCase().replace(/</g, "") + "\"</font> <font color='#7dff9c'>YOU'RE ALL SET.</font>"
                            : (String(bridge.voiceMode) === "LISTENING" ? "LISTENING..." : "WAITING FOR YOUR TALK BUTTON...")
-                       color: "#bfffd0"; wrapMode: Text.WordWrap; font.family: Theme.crtFont; font.pixelSize: 46 * wz.s }
+                       color: Theme.t("#bfffd0"); wrapMode: Text.WordWrap; font.family: Theme.crtFont; font.pixelSize: 46 * wz.s }
                 Text { width: parent.width; visible: !!wz.screen.amber; text: wz.screen.amber || ""; wrapMode: Text.WordWrap; topPadding: 30 * wz.s
-                       color: "#ffcf6e"; font.family: Theme.crtFont; font.pixelSize: 38 * wz.s }
+                       color: Theme.t("#ffcf6e"); font.family: Theme.crtFont; font.pixelSize: 38 * wz.s }
                 Text { width: parent.width; visible: !!wz.screen.note; text: wz.screen.note || ""; wrapMode: Text.WordWrap; topPadding: 24 * wz.s
-                       color: "#bfffd0"; opacity: 0.55; font.family: Theme.crtFont; font.pixelSize: 32 * wz.s }
+                       color: Theme.t("#bfffd0"); opacity: 0.55; font.family: Theme.crtFont; font.pixelSize: 32 * wz.s }
             }
             // READY: two roads, each with its own key underneath
             Item {
@@ -562,15 +564,15 @@ Item {
                 visible: !!wz.screen.split
                 anchors.fill: parent; anchors.margins: 18 * wz.s
                 Text { id: splitHead; anchors.horizontalCenter: parent.horizontalCenter; y: 6 * wz.s
-                       text: "YOUR BRIDGE IS READY. PICK HOW YOU WANT TO FLY."; color: "#bfffd0"; font.family: Theme.crtFont; font.pixelSize: 46 * wz.s }
+                       text: "YOUR BRIDGE IS READY. PICK HOW YOU WANT TO FLY."; color: Theme.t("#bfffd0"); font.family: Theme.crtFont; font.pixelSize: 46 * wz.s }
                 Text { anchors.horizontalCenter: parent.horizontalCenter; y: splitHead.y + splitHead.height + 2 * wz.s
-                       text: "YOU CAN ADD AI LATER IN SETUP > VOICE & AI."; color: "#bfffd0"; opacity: 0.5; font.family: Theme.crtFont; font.pixelSize: 26 * wz.s }
+                       text: "YOU CAN ADD AI LATER IN SETUP > VOICE & AI."; color: Theme.t("#bfffd0"); opacity: 0.5; font.family: Theme.crtFont; font.pixelSize: 26 * wz.s }
                 Repeater {
                     model: [
                         { head: "BRIDGE BASIC", tag: "FREE", col: "#7dff9c", ai: false,
                           rows: ["DECK KEYS DOCK, LAUNCH AND JUMP FOR YOU", "STATION SERVICES, COMBAT TARGETING", "ROUTES, TRADE AND COLONY PAGES", "SHIP VOICE ALERTS + IN-GAME OVERLAY", "NOTHING TO SIGN UP FOR"],
                           cost: "FREE, NO ACCOUNT NEEDED" },
-                        { head: "AI CO-PILOT", tag: bridge.aiApiVerified ? "SET UP" : "ADD-ON", col: "#ffcf6e", ai: true,
+                        { head: "AI CO-PILOT", tag: bridge.aiApiVerified ? "SET UP" : "ADD-ON", col: Theme.t("#ffcf6e"), ai: true,
                           rows: ["EVERYTHING ON THE LEFT, PLUS:", "TALK TO YOUR SHIP WITH PUSH TO TALK", "ASK ANYTHING: ROUTES, TRADES, YOUR STATS", "GIVE ORDERS BY VOICE", "NEEDS YOUR OWN OPENAI ACCOUNT"],
                           cost: bridge.aiApiVerified ? "YOUR AI CO-PILOT IS ALREADY SET UP" : "TALKING TO THE AI COSTS FRACTIONS OF A PENNY" }
                     ]
@@ -610,7 +612,7 @@ Item {
                             x: 26 * wz.s; y: pic.y + pic.height + 18 * wz.s; width: parent.width - 52 * wz.s; spacing: 10 * wz.s
                             Repeater { model: modelData.rows
                                 delegate: Text { required property var modelData; width: parent.width; elide: Text.ElideRight
-                                    text: "> " + modelData; color: "#bfffd0"; opacity: 0.85; font.family: Theme.crtFont; font.pixelSize: 34 * wz.s } }
+                                    text: "> " + modelData; color: Theme.t("#bfffd0"); opacity: 0.85; font.family: Theme.crtFont; font.pixelSize: 34 * wz.s } }
                         }
                         Text { x: 26 * wz.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 14 * wz.s; width: parent.width - 52 * wz.s; elide: Text.ElideRight
                                text: modelData.cost; color: modelData.col; font.family: Theme.crtFont; font.pixelSize: 30 * wz.s }
@@ -657,7 +659,7 @@ Item {
                     required property int index
                     width: (wz.screen.split ? 420 : (keyRow.ks.length > 2 ? 340 : (keyRow.ks.length > 1 ? 360 : 420))) * wz.s; height: 120 * wz.s
                     Rectangle { visible: index === keyRow.def; anchors.fill: parent; anchors.margins: -8 * wz.s; radius: 8 * wz.s
-                                color: "transparent"; border.color: Qt.rgba(0.49, 1, 0.61, 0.6); border.width: 2 }
+                                color: "transparent"; border.color: Theme.t(Qt.rgba(0.49, 1, 0.61, 0.6)); border.width: 2 }
                     DeckKey {
                         anchors.fill: parent
                         title: String(modelData[0]); legend: String(modelData[1])
@@ -714,7 +716,7 @@ Item {
             visible: true
             Rectangle {
                 anchors.fill: parent; radius: 22
-                color: "#ee050b07"; border.color: idWin.here ? Theme.ok : Theme.phosphor; border.width: 5
+                color: Theme.t("#ee050b07"); border.color: idWin.here ? Theme.ok : Theme.phosphor; border.width: 5
                 Text { anchors.horizontalCenter: parent.horizontalCenter; y: idWin.side * 0.07; text: "SCREEN"
                        color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: idWin.side * 0.12; font.letterSpacing: 6 }
                 Text { anchors.centerIn: parent; anchors.verticalCenterOffset: 14; text: String(idWin.index + 1)

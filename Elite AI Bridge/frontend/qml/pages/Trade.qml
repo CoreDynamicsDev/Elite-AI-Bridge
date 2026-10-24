@@ -241,13 +241,13 @@ Item {
                     id: haulField
                     x: 6 * tr.s; y: 4 * tr.s
                     width: haulBezel.width - haulBezel.pad * 2 - 12 * tr.s; height: Math.max(26, 46 * tr.s)
-                    color: "#0a7dff9c"; border.color: haulInput.activeFocus ? "#807dff9c" : "#337dff9c"; border.width: 1
+                    color: Theme.t("#0a7dff9c"); border.color: haulInput.activeFocus ? Theme.t("#807dff9c") : Theme.t("#337dff9c"); border.width: 1
                     TextInput {
                         id: haulInput
                         objectName: "tradeHaulInput"
                         x: 10 * tr.s; width: parent.width - 20 * tr.s; height: parent.height
                         verticalAlignment: TextInput.AlignVCenter
-                        color: Theme.ok; selectionColor: "#2f7a45"; selectedTextColor: Theme.control
+                        color: Theme.ok; selectionColor: Theme.t("#2f7a45"); selectedTextColor: Theme.control
                         font.family: Theme.crtFont; font.pixelSize: haulBezel.fs; font.letterSpacing: 1.5 * tr.s; font.capitalization: Font.AllUppercase
                         clip: true; selectByMouse: true
                         cursorDelegate: Rectangle {
@@ -395,7 +395,7 @@ Item {
                         readonly property bool bad: modelData.knownProhibited === true
                         readonly property string comm: tr.listMode === "best" ? String(modelData.commodity) : tr.shownHaul
                         Rectangle { anchors.fill: parent; visible: parent.picked || rowPress.containsMouse
-                                    color: parent.picked ? "#2a7dff9c" : "#127dff9c"; border.color: parent.picked ? "#807dff9c" : "transparent"; border.width: 1 }
+                                    color: parent.picked ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.picked ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                         Text { x: 4 * tr.s; anchors.verticalCenter: parent.verticalCenter; text: (parent.picked ? ">" : " ") + ("0" + (index + 1)).slice(-2); color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: routeList.fontSize }
                         Row {
                             x: parent.width * rBezel.cx[1]; anchors.verticalCenter: parent.verticalCenter
@@ -467,7 +467,7 @@ Item {
                     // profit per load, the big number
                     Rectangle {
                         width: parent.width; height: profitTxt.height + 30 * tr.s
-                        color: "#0c7dff9c"; border.color: "#337dff9c"; border.width: 1
+                        color: Theme.t("#0c7dff9c"); border.color: Theme.t("#337dff9c"); border.width: 1
                         Text { x: 12 * tr.s; y: 6 * tr.s; text: "PROFIT PER LOAD"; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: cBezel.fs * 0.75 }
                         Text {
                             id: profitTxt
@@ -487,7 +487,7 @@ Item {
                             ] : []
                             Rectangle {
                                 width: (parent.width - 16 * tr.s) / 3; height: cBezel.fs * 2.3
-                                color: "#087dff9c"; border.color: "#2a7dff9c"; border.width: 1
+                                color: Theme.t("#087dff9c"); border.color: Theme.t("#2a7dff9c"); border.width: 1
                                 Text { x: 8 * tr.s; y: 4 * tr.s; text: modelData[0]; color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: cBezel.fs * 0.7 }
                                 Text { x: 8 * tr.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * tr.s; text: modelData[1]; color: modelData[2]; font.family: Theme.crtFont; font.pixelSize: cBezel.fs * 1.05 }
                             }
@@ -538,7 +538,7 @@ Item {
         z: 20
         x: haulBezel.x + 6 * tr.s; y: tr.bodyY + haulBezel.y + haulBezel.height - 6 * tr.s
         width: haulBezel.width * 1.15; height: pickCol.height + 12 * tr.s
-        color: "#f0060d08"; border.color: "#807dff9c"; border.width: 1
+        color: Theme.t("#f0060d08"); border.color: Theme.t("#807dff9c"); border.width: 1
         Column {
             id: pickCol
             x: 6 * tr.s; y: 6 * tr.s; width: parent.width - 12 * tr.s
@@ -546,7 +546,7 @@ Item {
                 model: haulPicks.matches.slice(0, 8)
                 Rectangle {
                     width: pickCol.width; height: haulPicks.fs * 1.35
-                    color: pickArea.containsMouse || index === 0 ? "#227dff9c" : "transparent"
+                    color: pickArea.containsMouse || index === 0 ? Theme.t("#227dff9c") : "transparent"
                     Text { x: 8 * tr.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 16 * tr.s; elide: Text.ElideRight
                            text: (index === 0 ? "> " : "  ") + tr.up(modelData); color: index === 0 ? Theme.ok : Theme.phosphor; font.family: Theme.crtFont; font.pixelSize: haulPicks.fs }
                     PressArea { id: pickArea; anchors.fill: parent; onActivated: { tr.haul = modelData; haulInput.text = modelData; haulInput.focus = false; Theme.cue("tick") } }
@@ -589,6 +589,8 @@ Item {
                 property real march: 0
                 NumberAnimation on march { from: 0; to: 1; duration: 1400; loops: Animation.Infinite; running: tr.visible && tr.tradeView === 1 && tr.hasLoop && tr.runActive }
                 Canvas {
+                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    onThemeAmberChanged: requestPaint()
                     id: loopCanvas
                     anchors.fill: parent
                     property real m: Math.floor(lBezel.march * 24) / 24
@@ -604,7 +606,7 @@ Item {
                             var live = tr.hasLoop && (isOut === b.outbound)
                             c.setLineDash(live ? [10 * tr.s, 8 * tr.s] : [5 * tr.s, 9 * tr.s])
                             c.lineDashOffset = live ? -b.march * 18 * tr.s : 0
-                            c.strokeStyle = live ? "rgba(125,255,156,0.9)" : "rgba(125,255,156,0.38)"
+                            c.strokeStyle = live ? "rgba(" + Theme.rgb("125,255,156") + ",0.9)" : "rgba(" + Theme.rgb("125,255,156") + ",0.38)"
                             c.lineWidth = live ? Math.max(2, 3 * tr.s) : Math.max(1, 2 * tr.s)
                             c.beginPath()
                             if (isOut) { c.moveTo(x0, y - b.r * 0.4); c.quadraticCurveTo((x0 + x1) / 2, top, x1, y - b.r * 0.4) }
@@ -652,7 +654,7 @@ Item {
                         Rectangle {
                             width: pods.pw; height: pods.pw * 0.9; radius: 2 * tr.s
                             readonly property bool on: (tr.atSell ? 3 - index : index) < pods.lit
-                            color: on ? "#9f7dff9c" : "#147dff9c"; border.color: on ? Theme.ok : "#447dff9c"; border.width: 1
+                            color: on ? Theme.t("#9f7dff9c") : Theme.t("#147dff9c"); border.color: on ? Theme.ok : Theme.t("#447dff9c"); border.width: 1
                         }
                     }
                 }
@@ -732,7 +734,7 @@ Item {
                                 width: (blocks.width - blocks.spacing * (blocks.n - 1)) / blocks.n; height: blocks.height
                                 readonly property bool on: index < blocks.lit
                                 readonly property bool now: tr.runActive && index === blocks.lit
-                                color: on ? "#a07dff9c" : (now ? "#55ffb84d" : "#127dff9c"); border.color: on ? Theme.ok : (now ? Theme.info : "#337dff9c"); border.width: 1
+                                color: on ? Theme.t("#a07dff9c") : (now ? Theme.t("#55ffb84d") : Theme.t("#127dff9c")); border.color: on ? Theme.ok : (now ? Theme.info : Theme.t("#337dff9c")); border.width: 1
                             }
                         }
                     }
@@ -783,7 +785,7 @@ Item {
                 Text { text: "HOLD"; color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: settingsPanel.lab; font.letterSpacing: 2 * tr.s }
                 Rectangle {
                     width: parent.width; height: 22 * tr.s
-                    color: "#060a07"; border.color: "#3e3b32"; border.width: 1
+                    color: Theme.t("#060a07"); border.color: "#3e3b32"; border.width: 1
                     Rectangle {
                         x: 2; y: 2; height: parent.height - 4
                         width: tr.cap > 0 ? (parent.width - 4) * Math.min(1, bridge.cargoUsed / tr.cap) : 0
@@ -903,7 +905,7 @@ Item {
         x: cx - lBezel.r * 1.6; y: lBezel.cy - lBezel.r * 1.6
         width: lBezel.r * 3.2; height: lBezel.r * 3.2
         // amber glow ring on the station you are docked at
-        Rectangle { anchors.centerIn: parent; width: lBezel.r * 2.9; height: width; radius: width / 2; visible: st.here; color: "#22ffb84d" }
+        Rectangle { anchors.centerIn: parent; width: lBezel.r * 2.9; height: width; radius: width / 2; visible: st.here; color: Theme.t("#22ffb84d") }
         Rectangle {
             anchors.centerIn: parent; width: lBezel.r * 2.9; height: width; radius: width / 2
             color: "transparent"; border.color: Theme.info; border.width: Math.max(2, 5 * tr.s)
@@ -914,8 +916,8 @@ Item {
         }
         Rectangle { anchors.centerIn: parent; width: lBezel.r * 2.2; height: width; radius: width / 2; color: "transparent"
                     border.color: tr.hasLoop ? Theme.ok : Theme.dimText; border.width: Math.max(2, 4 * tr.s) }
-        Rectangle { anchors.centerIn: parent; width: lBezel.r * 1.5; height: width; radius: width / 2; color: "#0c7dff9c"
-                    border.color: tr.hasLoop ? "#997dff9c" : "#335f8a6c"; border.width: Math.max(1, 2 * tr.s) }
+        Rectangle { anchors.centerIn: parent; width: lBezel.r * 1.5; height: width; radius: width / 2; color: Theme.t("#0c7dff9c")
+                    border.color: tr.hasLoop ? Theme.t("#997dff9c") : Theme.t("#335f8a6c"); border.width: Math.max(1, 2 * tr.s) }
         Rectangle { anchors.centerIn: parent; width: lBezel.r * 0.72; height: lBezel.r * 0.22; radius: 2 * tr.s; color: tr.hasLoop ? Theme.ok : Theme.dimText }
         Column {
             anchors.horizontalCenter: parent.horizontalCenter; y: parent.height + 2 * tr.s

@@ -426,7 +426,7 @@ Item {
                             readonly property real pct: Number(modelData.required) > 0 ? Math.min(1, Number(modelData.provided) / Number(modelData.required)) : 1
                             opacity: done ? 0.45 : 1
                             Rectangle { anchors.fill: parent; visible: parent.picked || shPress.containsMouse
-                                        color: parent.picked ? "#2a7dff9c" : "#127dff9c"; border.color: parent.picked ? "#807dff9c" : "transparent"; border.width: 1 }
+                                        color: parent.picked ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.picked ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                             Text { x: 4 * co.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.4; elide: Text.ElideRight
                                    text: (parent.picked ? "> " : "  ") + co.up(modelData.name); color: parent.picked ? Theme.ok : Theme.phosphor; font.family: Theme.crtFont; font.pixelSize: shList.fontSize }
                             Text { x: parent.width * shopping.cx[1] - width; anchors.verticalCenter: parent.verticalCenter
@@ -436,7 +436,7 @@ Item {
                             Rectangle {
                                 x: parent.width * shopping.cx[3]; anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width * (shopping.cx[4] - shopping.cx[3]) - 70 * co.s; height: shList.fontSize * 0.55
-                                color: "#0a1a10"; border.color: "#337dff9c"; border.width: 1
+                                color: Theme.t("#0a1a10"); border.color: Theme.t("#337dff9c"); border.width: 1
                                 Rectangle { x: 1; y: 1; height: parent.height - 2; width: (parent.width - 2) * parent.parent.pct; color: Theme.ok; opacity: 0.75 }
                             }
                             Text { x: parent.width * shopping.cx[4] - width; anchors.verticalCenter: parent.verticalCenter
@@ -497,7 +497,7 @@ Item {
                             height: byList.fontSize * 1.35
                             readonly property bool picked: index === co.supplySel
                             Rectangle { anchors.fill: parent; visible: parent.picked || byPress.containsMouse
-                                        color: parent.picked ? "#2a7dff9c" : "#127dff9c"; border.color: parent.picked ? "#807dff9c" : "transparent"; border.width: 1 }
+                                        color: parent.picked ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.picked ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                             Text { x: 4 * co.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width * 0.24; elide: Text.ElideRight
                                    text: (parent.picked ? "> " : "  ") + co.up(modelData.station); color: parent.picked ? Theme.ok : Theme.phosphor; font.family: Theme.crtFont; font.pixelSize: byList.fontSize }
                             Text { x: parent.width * buying.cx[1]; width: parent.width * 0.17; elide: Text.ElideRight; anchors.verticalCenter: parent.verticalCenter
@@ -584,7 +584,7 @@ Item {
                     readonly property string st: String(modelData.status)
                     readonly property color stColor: st === "COMPLETE" ? Theme.ok : (st === "FAILED" ? Theme.bad : (st === "CLAIMED" ? Theme.dimText : Theme.info))
                     Rectangle { anchors.fill: parent; visible: parent.sel || sPress.containsMouse
-                                color: parent.sel ? "#2a7dff9c" : "#127dff9c"; border.color: parent.sel ? "#807dff9c" : "transparent"; border.width: 1 }
+                                color: parent.sel ? Theme.t("#2a7dff9c") : Theme.t("#127dff9c"); border.color: parent.sel ? Theme.t("#807dff9c") : "transparent"; border.width: 1 }
                     Text { x: 4 * co.s; anchors.verticalCenter: parent.verticalCenter; width: parent.width * (aBezel.cx[1] - 0.075); elide: Text.ElideRight
                            text: (parent.sel ? "> " : "  ") + (String(modelData.station) === "-" ? "NO SITE SEEN YET" : co.up(modelData.station))
                            color: parent.sel ? Theme.ok : (String(modelData.station) === "-" ? Theme.dimText : Theme.phosphor); font.family: Theme.crtFont; font.pixelSize: pList.fontSize }
@@ -599,7 +599,7 @@ Item {
                         visible: parent.st !== "CLAIMED"
                         x: parent.width * aBezel.cx[3] + 10 * co.s; anchors.verticalCenter: parent.verticalCenter
                         width: parent.width * (aBezel.cx[4] - aBezel.cx[3]) - 14 * co.s; height: pList.fontSize * 0.55
-                        color: "#0a1a10"; border.color: "#337dff9c"; border.width: 1
+                        color: Theme.t("#0a1a10"); border.color: Theme.t("#337dff9c"); border.width: 1
                         Rectangle { x: 1; y: 1; height: parent.height - 2; width: (parent.width - 2) * Math.min(1, Number(modelData.progressPct) / 100); color: Theme.ok; opacity: 0.75 }
                     }
                     Text { visible: parent.st !== "CLAIMED"; x: parent.width * aBezel.cx[4]; anchors.verticalCenter: parent.verticalCenter
@@ -672,12 +672,14 @@ Item {
             return secR[secR.length - 1] * width
         }
         Canvas {
+            property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+            onThemeAmberChanged: requestPaint()
             id: cv
             anchors.fill: parent
             onPaint: {
                 var c = getContext("2d"); c.reset()
                 var w = width, h = height, cx = w / 2, th = sw.theta, p = sw.present ? sw.progress : 0
-                var G = "125,255,156", A = "255,184,77"
+                var G = Theme.rgb("125,255,156"), A = Theme.rgb("255,184,77")
                 var tilt = 0.22                       // ellipse squash for the 3D look
                 function ell(y, r, a, lw, front) {     // ring at height y, radius r
                     c.lineWidth = lw; c.strokeStyle = "rgba(" + G + "," + a + ")"

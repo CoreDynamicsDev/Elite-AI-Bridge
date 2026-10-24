@@ -1,4 +1,4 @@
-ELITE AI BRIDGE 2.0.3 - SOURCE BUILD
+ELITE AI BRIDGE 2.0.4 - SOURCE BUILD
 
 1. Extract the entire ZIP.
 2. Double-click RUN_CURRENT_SOURCE.bat in the top folder.

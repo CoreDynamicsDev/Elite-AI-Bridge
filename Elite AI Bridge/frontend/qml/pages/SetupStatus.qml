@@ -120,7 +120,7 @@ Item {
                     Item {
                         width: rowsCol.width; height: rowsCol.rh
                         readonly property color c: modelData.kind === "ok" ? Theme.ok : (modelData.kind === "bad" ? Theme.bad : (modelData.kind === "off" ? Theme.dimText : Theme.info))
-                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#1d3a26" }
+                        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.t("#1d3a26") }
                         Rectangle {
                             x: 2 * st.s; y: parent.height * 0.12 + cBezel.fs * 0.25
                             width: cBezel.fs * 0.55; height: width; radius: width / 2; color: parent.c
@@ -180,7 +180,7 @@ Item {
                 id: nameBox
                 x: 26 * st.s; y: parent.height - height - 22 * st.s
                 width: parent.width - 52 * st.s - saveName.width - 14 * st.s; height: 54 * st.s
-                radius: 6 * st.s; color: "#06140b"; border.color: nameInput.activeFocus ? Theme.ok : "#2e4a36"; border.width: 1
+                radius: 6 * st.s; color: Theme.t("#06140b"); border.color: nameInput.activeFocus ? Theme.ok : Theme.t("#2e4a36"); border.width: 1
                 TextInput {
                     id: nameInput
                     anchors.fill: parent; anchors.margins: 12 * st.s

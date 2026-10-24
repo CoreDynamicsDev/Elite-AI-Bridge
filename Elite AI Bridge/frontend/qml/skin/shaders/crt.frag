@@ -10,6 +10,7 @@ layout(std140, binding = 0) uniform buf {
     float staticAmt;
     float fxAmt;
     vec2 res;
+    vec4 phos;      // LAB themes: phosphor tint (green 0.45,1,0.55 / amber 1,0.69,0.16)
 };
 layout(binding = 1) uniform sampler2D src;
 
@@ -60,12 +61,12 @@ void main() {
 
     // static: grain, a little flicker, slow rolling scan bar
     float g = hash(floor(uv * res) + fract(time * 7.3) * 113.0) - 0.5;
-    col += vec3(0.75, 1.0, 0.8) * g * 0.24 * s;          // grain, tinted like the phosphor
-    col += vec3(0.45, 1.0, 0.55) * max(g, 0.0) * 0.10 * s; // 'snow' so grain also shows on dark glass
+    col += mix(vec3(1.0), phos.rgb, 0.45) * g * 0.24 * s; // grain, tinted like the phosphor
+    col += phos.rgb * max(g, 0.0) * 0.10 * s;            // 'snow' so grain also shows on dark glass
     col *= 1.0 - 0.03 * s * hash(vec2(floor(time * 24.0), 3.1));
     float bar = fract(time * 0.11);
     float d = abs(uv.y - bar);
-    col += vec3(0.065, 0.145, 0.08) * s * smoothstep(0.07, 0.0, d);
+    col += phos.rgb * 0.145 * s * smoothstep(0.07, 0.0, d);
 
     // vignette
     col *= 1.0 - 0.32 * dot(w, w) * 0.5;

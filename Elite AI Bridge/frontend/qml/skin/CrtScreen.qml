@@ -44,6 +44,7 @@ Item {
         property real time: 0
         property real staticAmt: crt.staticAmt
         property real fxAmt: crt.fxAmt
+        property vector4d phos: Theme.amber ? Qt.vector4d(1.0, 0.69, 0.16, 1.0) : Qt.vector4d(0.45, 1.0, 0.55, 1.0)   // LAB themes
         property vector2d res: Qt.vector2d(Math.max(1, width * Screen.devicePixelRatio), Math.max(1, height * Screen.devicePixelRatio))
         fragmentShader: Qt.resolvedUrl("shaders/crt.frag.qsb")
     }

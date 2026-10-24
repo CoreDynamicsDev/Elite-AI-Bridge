@@ -25,7 +25,7 @@ Item {
     height: Math.max(fontSize * 1.3, bodyText.implicitHeight + fontSize * 0.3)
     Behavior on height { NumberAnimation { duration: Theme.hoverInMs } }
 
-    Rectangle { anchors.fill: parent; color: "#147dff9c"; visible: row.hovered && (eventText.truncated || detailText.truncated || row.lines > 1) }
+    Rectangle { anchors.fill: parent; color: Theme.t("#147dff9c"); visible: row.hovered && (eventText.truncated || detailText.truncated || row.lines > 1) }
 
     Text {
         y: row.fontSize * 0.15

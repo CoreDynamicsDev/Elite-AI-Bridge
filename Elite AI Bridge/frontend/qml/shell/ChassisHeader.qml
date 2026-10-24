@@ -62,7 +62,7 @@ Item {
             font.family: Theme.stencilFont; font.pixelSize: Math.max(26, 60 * hdr.s); font.letterSpacing: 4 * hdr.s
             color: "#d8d0b8"; style: Text.Sunken; styleColor: "#1a1915"
         }
-        Dymo { id: verDymo; x: 6 * hdr.s; y: titleText.y + titleText.height + 6 * hdr.s; text: "CORE DYNAMICS DEV // UNIT " + bridge.appVersion }
+        Dymo { id: verDymo; x: 6 * hdr.s; y: titleText.y + titleText.height + 6 * hdr.s; text: "CORE DYNAMICS DEV // UNIT " + bridge.appVersion + (bridge.labBuild ? " // LAB" : "") }
         // 2.0.1: update tag beside the version. Slow amber pulse, always on screen (the status
         // screen gets taken by in-game alerts). Click opens SETUP > STATUS.
         Item {

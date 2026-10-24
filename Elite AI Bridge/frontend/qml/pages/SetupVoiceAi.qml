@@ -59,7 +59,7 @@ Item {
         LitButton { id: prev; x: 0; width: height; height: parent.height; centered: true; title: "<"; repeatMs: 60; onActivated: sp.step(-1) }
         Rectangle {
             x: prev.width + 6 * va.s; width: parent.width - prev.width * 2 - 12 * va.s; height: parent.height
-            radius: 5 * va.s; color: "#06140b"; border.color: "#2e4a36"
+            radius: 5 * va.s; color: Theme.t("#06140b"); border.color: Theme.t("#2e4a36")
             Text { anchors.centerIn: parent; text: String(sp.shown || "-").toUpperCase(); color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: Math.max(13, 26 * va.s) }
         }
         LitButton { anchors.right: parent.right; width: height; height: parent.height; centered: true; title: ">"; repeatMs: 60; onActivated: sp.step(1) }
@@ -297,7 +297,7 @@ Item {
                 width: parent.width - 52 * va.s; height: 46 * va.s; spacing: 14 * va.s
                 Rectangle {
                     width: parent.width - clearRules.width - parent.spacing; height: parent.height
-                    radius: 5 * va.s; color: "#06140b"; border.color: "#2e4a36"
+                    radius: 5 * va.s; color: Theme.t("#06140b"); border.color: Theme.t("#2e4a36")
                     Text { anchors.verticalCenter: parent.verticalCenter; x: 12 * va.s; width: parent.width - 24 * va.s; elide: Text.ElideRight
                            text: Number(bridge.aiSessionRuleCount || 0) + " SESSION RULE" + (Number(bridge.aiSessionRuleCount || 0) === 1 ? "" : "S") + " // RULES YOU GIVE THE AI LAST UNTIL THE BRIDGE CLOSES"
                            color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: Math.max(12, 21 * va.s) }
@@ -331,7 +331,7 @@ Item {
                 id: ctxBox
                 x: 26 * va.s; y: kb.y + kb.height + 10 * va.s
                 width: parent.width - 52 * va.s - saveCtx.width - 14 * va.s; height: parent.height - y - 46 * va.s
-                radius: 6 * va.s; color: "#06140b"; border.color: ctx.activeFocus ? Theme.ok : "#2e4a36"
+                radius: 6 * va.s; color: Theme.t("#06140b"); border.color: ctx.activeFocus ? Theme.ok : Theme.t("#2e4a36")
                 ScrollView {
                     anchors.fill: parent; anchors.margins: 6 * va.s
                     TextArea {

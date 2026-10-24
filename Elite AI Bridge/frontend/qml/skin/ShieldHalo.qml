@@ -10,7 +10,7 @@ ShaderEffect {
     property vector2d centerAt: Qt.vector2d(0.5, 0.6)
     property vector2d ringRadii: Qt.vector2d(0.46, 0.17)
     property real dome: 0.40
-    property color color: shield === "UP" ? Theme.ok : (shield === "DOWN" ? Theme.bad : Theme.dimText)
+    property color color: shield === "UP" ? Theme.screen : (shield === "DOWN" ? Theme.bad : Theme.dimText)
     property vector2d size: Qt.vector2d(width, height)
     property vector2d center: centerAt
     property vector2d radii: ringRadii

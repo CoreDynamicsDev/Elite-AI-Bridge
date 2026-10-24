@@ -24,7 +24,7 @@ Item {
     readonly property int used: Math.max(0, bridge.cargoUsed)
     readonly property int listedTons: { var n = 0; for (var i = 0; i < cargo.length; i++) n += Number(cargo[i].qty); return n }
     readonly property int limpets: { var n = 0; for (var i = 0; i < cargo.length; i++) if (cargo[i].drones) n += Number(cargo[i].qty); return n }
-    readonly property var cargoShades: ["#7dff9c", "#4fc777", "#a9e8bb", "#35a35a", "#c9ffd8", "#5fdc88"]
+    readonly property var cargoShades: [Theme.t("#7dff9c"), Theme.t("#4fc777"), Theme.t("#a9e8bb"), Theme.t("#35a35a"), Theme.t("#c9ffd8"), Theme.t("#5fdc88")]
     function cargoColor(r, i) { return r.stolen > 0 ? Theme.info : (r.drones ? Theme.dimText : cargoShades[i % cargoShades.length]) }
 
     // full loadout: core, optional, hardpoints, utility (the four that matter in flight are on Flight Deck)
@@ -83,7 +83,7 @@ Item {
             id: holdBar
             x: 14 * hv.s; y: hBezel.fs * 1.5
             width: hBezel.iw - 28 * hv.s; height: hBezel.fs * 0.85
-            color: "#0a1a10"; border.color: "#337dff9c"; border.width: 1
+            color: Theme.t("#0a1a10"); border.color: Theme.t("#337dff9c"); border.width: 1
             Row {
                 x: 1; y: 1; height: parent.height - 2
                 Repeater {
@@ -92,7 +92,7 @@ Item {
                         readonly property real total: Math.max(hv.cap, hv.used, hv.listedTons, 1)
                         height: parent.height; width: Math.max(1, (holdBar.width - 2) * Number(modelData.qty) / total)
                         color: hv.cargoColor(modelData, index); opacity: 0.8
-                        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#06140b" }
+                        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.t("#06140b") }
                     }
                 }
             }

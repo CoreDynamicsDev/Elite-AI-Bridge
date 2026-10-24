@@ -15,7 +15,7 @@ Window {
     minimumWidth: 1280
     minimumHeight: 720
     color: "#070706"
-    title: "Elite AI Bridge 2.0"
+    title: bridge.labBuild ? "Elite AI Bridge LAB" : "Elite AI Bridge 2.0"
     property bool closeAuthorized: false
     // Universal launch cinematic. It runs before wizard, startup health, or cockpit.
     property bool startupMovieVisible: false // v0.30.35: startup movie disabled during development
@@ -461,6 +461,9 @@ Window {
     }
 
     function syncWizardWithBackend() {
+        // LAB: hold the wizard (and its voice) until the boot splash has faded.
+        // Without this the first screen started talking under the splash.
+        if (!bridge.bootSplashDone) return
         if (!bridge.connected) {
             wizardLastConnected = false
             return
@@ -537,6 +540,10 @@ Window {
         if (introVisible && !bridge.connected) syncWizardWithBackend()
     }
     Component.onCompleted: { startupPreflightLatched=bridge.startupPreflightEnabled; overlayRuntimeRequested=bridge.gameOverlayEnabled; syncWizardWithBackend(); publishUiContext() }
+    Connections {
+        target: bridge
+        function onBootSplashChanged() { root.syncWizardWithBackend() }
+    }
     Connections {
         target: bridge
         function onStateChanged() {

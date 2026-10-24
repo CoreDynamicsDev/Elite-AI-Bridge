@@ -17,6 +17,8 @@ Item {
     FrameAnimation { running: wl.animate && wl.visible; onTriggered: wl.t = (wl.t + frameTime) % 4.0 }
 
     Canvas {
+        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+        onThemeAmberChanged: requestPaint()
         id: trace
         anchors.fill: parent
         property real tt: Math.round(wl.t * 30) / 30

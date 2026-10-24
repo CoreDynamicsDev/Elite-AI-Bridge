@@ -22,11 +22,13 @@ ready at 14.2 s the docked frame holds (station keeps turning) until it is, or u
 """
 
 import math
+import os
 import random
+import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, QTimer, Qt, QLineF
+from PySide6.QtCore import QPointF, QRectF, QSettings, QTimer, Qt, QLineF
 from PySide6.QtGui import (QBrush, QColor, QFont, QFontDatabase, QImage, QLinearGradient, QPainter,
                            QPen, QPixmap, QPolygonF, QRadialGradient)
 from PySide6.QtWidgets import QWidget
@@ -56,6 +58,101 @@ G = (125, 255, 160)
 A = (255, 180, 70)
 WH = (235, 255, 240)
 RD = (255, 90, 72)
+
+# ---------------------------------------------------------------- LAB: screen theme + sound
+# Setup > Display > THEME and Setup > Sound > STARTUP SOUND live in the frontend settings
+# (main.py writes them), so the splash can read them before the backend is running.
+_AMBER = False
+_SETTINGS = ("EliteAIBridge", "QMLFrontend")
+SOUNDS = HERE / "sounds"
+
+
+def _scr(r, g, b, a=None):
+    """Screen colour for the current theme (same rule as Theme.t() in QML)."""
+    if _AMBER:
+        mx, mn = max(r, g, b), min(r, g, b)
+        if mx > 0 and g >= r and g >= b and g > mn:
+            k = min(1.0, 0.35 + 1.3 * (mx - mn) / mx)
+            r, g, b = mx, int(mx * (0.957 * (1 - k) + 0.69 * k)), int(mx * (0.878 * (1 - k) + 0.157 * k))
+        elif mx > 0 and r >= g >= b and 0.55 <= g / r <= 0.9 and b / r < 0.45:
+            r, g, b = mx, int(mx * 0.95), int(mx * 0.42)
+    return (r, g, b) if a is None else (r, g, b, a)
+
+
+def _apply_theme():
+    global _AMBER, G, A
+    try:
+        _AMBER = str(QSettings(*_SETTINGS).value("display/screen_theme", "GREEN") or "").upper() == "AMBER"
+    except Exception:
+        _AMBER = False
+    G = _scr(125, 255, 160) if _AMBER else (125, 255, 160)
+    A = _scr(255, 180, 70) if _AMBER else (255, 180, 70)
+
+
+def _sound_settings():
+    """(enabled, volume 0..1) for the startup sound."""
+    try:
+        st = QSettings(*_SETTINGS)
+        on = str(st.value("audio/startup_sound", True)).strip().lower() not in ("false", "0", "no", "off")
+        vol = int(st.value("audio/last_sfx_volume", 50))
+    except Exception:
+        on, vol = True, 50
+    return on, max(0.0, min(1.0, vol / 100.0)) * 0.9
+
+
+class _Sound:
+    """One startup sound, played with winsound (Windows' own player, no extra libraries).
+    QtMultimedia is avoided on purpose: it can crash on machines without a working audio
+    device, and the splash must never be the thing that stops the Bridge from starting.
+    The volume is applied by writing a scaled copy of the WAV next to the Bridge logs."""
+
+    def __init__(self, name, volume):
+        self.path = None
+        src = SOUNDS / name
+        if sys.platform != "win32" or not src.exists() or volume <= 0.0:
+            return
+        try:
+            import wave
+            import array
+            base = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "EliteAIBridge" / "sound_cache"
+            base.mkdir(parents=True, exist_ok=True)
+            out = base / ("%s_v%02d.wav" % (src.stem, int(round(volume * 20))))
+            if not out.exists() or out.stat().st_mtime < src.stat().st_mtime:
+                with wave.open(str(src), "rb") as w:
+                    params = w.getparams()
+                    frames = array.array("h", w.readframes(w.getnframes()))
+                g = max(0.0, min(1.0, volume))
+                frames = array.array("h", (int(v * g) for v in frames))
+                tmp = out.with_suffix(".tmp")
+                with wave.open(str(tmp), "wb") as w:
+                    w.setparams(params)
+                    w.writeframes(frames.tobytes())
+                os.replace(tmp, out)
+            self.path = str(out)
+        except Exception:
+            self.path = None
+
+    def play(self):
+        if not self.path:
+            return False
+        try:
+            import winsound
+            winsound.PlaySound(self.path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+            return True
+        except Exception:
+            return False
+
+
+def play_startup_preview(parent=None):
+    """Setup > Sound TEST key: play the startup sound and the power-off once."""
+    _on, vol = _sound_settings()
+    boot = _Sound("splash_boot.wav", vol)
+    off = _Sound("splash_off.wav", vol)
+    if not boot.play():
+        return False
+    if off.path:
+        QTimer.singleShot(int((STORY_END + 0.05) * 1000), off.play)
+    return True
 
 
 def clamp(x, a=0.0, b=1.0):
@@ -304,6 +401,10 @@ class BootSplash(QWidget):
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.setStyleSheet("background:#0b0b09;")
 
+        _apply_theme()   # LAB: OLD SCHOOL AMBER recolours the picture (housing stays the same)
+        snd_on, snd_vol = _sound_settings()
+        self._snd_boot = _Sound("splash_boot.wav", snd_vol) if snd_on else None
+        self._snd_off = _Sound("splash_off.wav", snd_vol) if snd_on else None
         self._ready_probe = None
         self._main_window = None
         self._created_at = time.monotonic()
@@ -358,6 +459,12 @@ class BootSplash(QWidget):
         """Start the power-off now (used when the Bridge is ready, or as a manual skip)."""
         if self._off_start is None:
             self._off_start = time.monotonic()
+            if self._snd_off is not None:
+                self._snd_off.play()
+
+    def _play_boot_sound(self):
+        if self._snd_boot is not None and self._off_start is None:
+            self._snd_boot.play()
 
     # ------------------------------------------------------------------ timing
     def showEvent(self, event):
@@ -399,6 +506,8 @@ class BootSplash(QWidget):
                 self._steady = self._steady + 1 if gap < STEADY_GAP else 0
             if self._steady >= STEADY_TICKS or now - first >= STEADY_MAX_WAIT:
                 self._seq_start = now + START_DELAY
+                # LAB: startup sound starts with the story clock
+                QTimer.singleShot(int(START_DELAY * 1000), self._play_boot_sound)
             else:
                 self.update()
                 return
@@ -713,7 +822,7 @@ class BootSplash(QWidget):
 
     # ------------------------------------------------------------------ scenes
     def _draw_selftest(self, p, t):
-        s, _ = typed("CORE DYNAMICS DEV  //  BRIDGE SYSTEMS  //  UNIT 2.0.3", t, 0.62, 70)
+        s, _ = typed("CORE DYNAMICS DEV  //  BRIDGE SYSTEMS  //  UNIT 2.0.4", t, 0.62, 70)
         self._text(p, (46, 46), s, "vt", 32, G, 0.95)
         s2, _ = typed("COLD START SEQUENCE", t, 1.15, 50)
         self._text(p, (46, 86), s2, "vt", 32, G, 0.7)
@@ -853,7 +962,7 @@ class BootSplash(QWidget):
         xl = proj_group(self._xp, self._xg) if len(self._xp) else []
         dl = proj_group(self._dp, self._dg) if len(self._dp) else []
         dflick = (0.55 + 0.45 * np.sin(tw * 1.3 + self._dseed * 1.7)).tolist() if len(self._dp) else []
-        fill = QColor(4, 11, 7)
+        fill = QColor(*_scr(4, 11, 7))
         nofill_pen = Qt.NoPen
         el_idx, el_str, el_fill = self._el_idx, self._el_strokes, self._el_fill
         mesh_E = self._mesh.E
@@ -974,7 +1083,7 @@ class BootSplash(QWidget):
         M = np.stack([x, y, d], 1)
         sc = 1.8
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(4, 11, 7))
+        p.setBrush(QColor(*_scr(4, 11, 7)))
         for tri in self._ship_tri:
             pp = [self._project((M @ (v * sc) + q) @ R.T, dist, cx, cy)[0] for v in tri]
             p.drawPolygon(QPolygonF([QPointF(float(a[0]), float(a[1])) for a in pp]))
@@ -1119,7 +1228,7 @@ class BootSplash(QWidget):
                 sy = rnd.randrange(0, int(248 * Q))
                 sh = rnd.randrange(3, 12)
                 dx = rnd.randrange(-22, 22)
-                p.fillRect(QRectF(0, yq + sy, iw, sh), QColor(3, 8, 5))
+                p.fillRect(QRectF(0, yq + sy, iw, sh), QColor(*_scr(3, 8, 5)))
                 p.drawImage(QRectF(dx, yq + sy, iw, sh), self._title_g, QRectF(0, sy, iw, sh))
         else:
             p.drawImage(QPointF(0, yq), self._title_g)
@@ -1145,7 +1254,7 @@ class BootSplash(QWidget):
     # ------------------------------------------------------------------ frame
     def _render_content(self, t, tw):
         img = self._content
-        img.fill(QColor(3, 8, 5))
+        img.fill(QColor(*_scr(3, 8, 5)))
         p = QPainter(img)
         p.setRenderHint(QPainter.Antialiasing, True)
         p.setRenderHint(QPainter.TextAntialiasing, True)
@@ -1218,7 +1327,7 @@ class BootSplash(QWidget):
         bar = ((tw / 4.0) % 1.0) * (CH + 220) - 110
         gr = QLinearGradient(0, bar - 52, 0, bar + 52)
         gr.setColorAt(0, QColor(0, 0, 0, 0))
-        gr.setColorAt(0.5, QColor(10, 24, 14, 255))
+        gr.setColorAt(0.5, QColor(*_scr(10, 24, 14, 255)))
         gr.setColorAt(1, QColor(0, 0, 0, 0))
         p.setOpacity(1.0)
         p.fillRect(QRectF(0, bar - 52, CW, 104), gr)
@@ -1248,7 +1357,7 @@ class BootSplash(QWidget):
     def _paint_glass(self, p, t, tw, off_k, rect):
         sx = rect.width() / SW
         sy = rect.height() / SH
-        p.fillRect(rect, QColor(3, 8, 5))
+        p.fillRect(rect, QColor(*_scr(3, 8, 5)))
         if self._seq_start is None and off_k is None and t <= 0 and tw <= 0:
             return
         if t < 0.12 and off_k is None:
@@ -1393,7 +1502,7 @@ class BootSplash(QWidget):
         if self._off_start is not None:
             off_k = clamp((time.monotonic() - self._off_start) / OFF_LEN)
             if off_k >= 1.0:
-                p.fillRect(QRectF(ox + SX * k, oy + SY * k, SW * k, SH * k), QColor(3, 8, 5))
+                p.fillRect(QRectF(ox + SX * k, oy + SY * k, SW * k, SH * k), QColor(*_scr(3, 8, 5)))
                 self._paint_lamps(p, self._t, self._tw, k, QPointF(ox, oy))
                 p.end()
                 return
@@ -1408,7 +1517,7 @@ class BootSplash(QWidget):
     def _paint_standby(self, p, rect, k):
         """Shown while the Bridge loads (the GUI thread is busy, so this frame is static):
         the tube warming up, a soft glow and STAND BY, so the wait never looks like nothing."""
-        p.fillRect(rect, QColor(3, 8, 5))
+        p.fillRect(rect, QColor(*_scr(3, 8, 5)))
         # The warm-up frame looked dead. Static + scan lines, in content space.
         # While the Bridge loads this frame is painted once and stays still; once the
         # event loop runs (waiting for steady frames) the static shimmers and a faint
@@ -1427,7 +1536,7 @@ class BootSplash(QWidget):
         bar = ((now / 3.2) % 1.0) * (CH + 220) - 110
         gr = QLinearGradient(0, bar - 60, 0, bar + 60)
         gr.setColorAt(0, QColor(0, 0, 0, 0))
-        gr.setColorAt(0.5, QColor(40, 90, 55, 70))
+        gr.setColorAt(0.5, QColor(*_scr(40, 90, 55, 70)))
         gr.setColorAt(1, QColor(0, 0, 0, 0))
         p.setOpacity(1.0)
         p.fillRect(QRectF(0, bar - 60, CW, 120), gr)
@@ -1436,13 +1545,13 @@ class BootSplash(QWidget):
         p.restore()
         c = rect.center()
         g = QRadialGradient(c, rect.width() * 0.42)
-        g.setColorAt(0.0, QColor(60, 140, 90, 70))
-        g.setColorAt(0.5, QColor(30, 80, 50, 28))
+        g.setColorAt(0.0, QColor(*_scr(60, 140, 90, 70)))
+        g.setColorAt(0.5, QColor(*_scr(30, 80, 50, 28)))
         g.setColorAt(1.0, QColor(0, 0, 0, 0))
         p.fillRect(rect, g)
         p.setFont(self._font("vt", 40 * k))
-        p.setPen(QColor(125, 255, 160, 150))
+        p.setPen(QColor(*_scr(125, 255, 160, 150)))
         p.drawText(rect, Qt.AlignCenter, "STAND BY _")
         p.setFont(self._font("vt", 26 * k))
-        p.setPen(QColor(125, 255, 160, 90))
+        p.setPen(QColor(*_scr(125, 255, 160, 90)))
         p.drawText(QRectF(rect.left(), c.y() + 34 * k, rect.width(), 40 * k), Qt.AlignHCenter | Qt.AlignTop, "TUBE WARMING")

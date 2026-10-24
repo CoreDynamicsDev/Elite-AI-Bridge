@@ -34,13 +34,13 @@ Item {
         visible: pl.overflow
         anchors.right: parent.right; anchors.rightMargin: 4 * Theme.s
         y: 0; width: 12 * Theme.s; height: lv.height
-        radius: 2; color: "#73000000"; border.color: "#4d9dffb6"; border.width: 1
+        radius: 2; color: "#73000000"; border.color: Theme.t("#4d9dffb6"); border.width: 1
         Rectangle {
             id: thumb
             x: 2; width: parent.width - 4; radius: 1
             height: Math.max(20, (parent.height - 4) * lv.visibleArea.heightRatio)
             y: 2 + (parent.height - 4 - height) * (lv.visibleArea.yPosition / Math.max(0.0001, 1 - lv.visibleArea.heightRatio))
-            color: "#9dffb6"; opacity: thumbArea.containsMouse || thumbArea.pressed ? 0.8 : 0.55
+            color: Theme.t("#9dffb6"); opacity: thumbArea.containsMouse || thumbArea.pressed ? 0.8 : 0.55
         }
         MouseArea {
             id: thumbArea
