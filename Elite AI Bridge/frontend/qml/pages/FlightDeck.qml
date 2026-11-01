@@ -13,6 +13,27 @@ Item {
     readonly property Item logTarget: logPanel
     readonly property Item routeTarget: routePanel
     signal denied(string title, string reason)
+    signal openDeliveries()
+
+    // 2026-10-25 DELIVERY chip on the route plate: soonest module/ship on its way (Commander > DELIVERY has the list)
+    readonly property var deliveries: bridge.commanderDeliveries || []
+    property real nowSec: Date.now() / 1000
+    Timer { interval: 1000; repeat: true; running: deck.visible && deck.deliveries.length > 0; onTriggered: deck.nowSec = Date.now() / 1000 }
+    onVisibleChanged: if (visible) nowSec = Date.now() / 1000
+    readonly property var nextDelivery: {
+        var best = null
+        for (var i = 0; i < deliveries.length; i++) {
+            var d = deliveries[i]
+            if (Number(d.arriveAt) > nowSec && (best === null || Number(d.arriveAt) < Number(best.arriveAt))) best = d
+        }
+        if (best === null && deliveries.length > 0) best = deliveries[deliveries.length - 1]
+        return best
+    }
+    function hms(sec) {
+        sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60
+        function two(n) { return (n < 10 ? "0" : "") + n }
+        return h > 0 ? h + ":" + two(m) + ":" + two(x) : m + ":" + two(x)
+    }
 
     readonly property real s: Theme.s
     readonly property real g: Math.max(8, 14 * s)            // gap between panels
@@ -406,6 +427,28 @@ Item {
         width: deck.width; height: deck.routeH
         screwSize: 13 * deck.s
         Dymo { x: 26 * deck.s; y: 14 * deck.s; text: "ROUTE // NEXT 5 JUMPS" }
+        Rectangle {
+            id: delChip
+            objectName: "flightDeliveryChip"
+            visible: deck.nextDelivery !== null
+            readonly property bool arrived: deck.nextDelivery !== null && Number(deck.nextDelivery.arriveAt) <= deck.nowSec
+            anchors.right: parent.right; anchors.rightMargin: 24 * deck.s; y: 10 * deck.s
+            width: chipText.implicitWidth + 28 * deck.s; height: 32 * deck.s; radius: 4 * deck.s
+            color: chipHover.containsMouse ? "#221a08" : "#120e05"
+            border.color: arrived ? Theme.ok : Theme.info; border.width: Math.max(1, 2 * deck.s)
+            Text {
+                id: chipText
+                anchors.centerIn: parent
+                text: deck.nextDelivery === null ? ""
+                      : "DELIVERY // " + String(deck.nextDelivery.name || "").toUpperCase() + "  "
+                        + (delChip.arrived ? "ARRIVED" : deck.hms(Number(deck.nextDelivery.arriveAt) - deck.nowSec))
+                        + (deck.deliveries.length > 1 ? "  // +" + (deck.deliveries.length - 1) + " MORE" : "")
+                color: delChip.arrived ? Theme.ok : Theme.info
+                font.family: Theme.crtFont; font.pixelSize: Math.max(11, 20 * deck.s); font.letterSpacing: 1 * deck.s
+            }
+            MouseArea { id: chipHover; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                        onClicked: deck.openDeliveries() }
+        }
         Bezel {
             id: routeBezel
             x: 16 * deck.s; y: 50 * deck.s

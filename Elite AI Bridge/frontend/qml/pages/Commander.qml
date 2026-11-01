@@ -76,6 +76,28 @@ Item {
         for (var i = 0; i < fleet.length; i++) if (Number(fleet[i].shipId) === fleetSel) return fleet[i]
         return null
     }
+    // ---------- DELIVERIES: modules and ships on their way (backend sends arrival times; the clock ticks here)
+    property var deliveries: []
+    property string deliveriesKey: ""
+    readonly property var liveDeliveries: bridge.commanderDeliveries || []
+    onLiveDeliveriesChanged: {
+        var k = JSON.stringify(liveDeliveries); if (k !== deliveriesKey) { deliveriesKey = k; deliveries = liveDeliveries }
+        var n = liveDeliveries.length
+        if (visible && n > seenDeliveries) oddPlate.view = 2
+        seenDeliveries = n
+    }
+    property real nowSec: Date.now() / 1000
+    Timer { interval: 1000; repeat: true; running: cm.visible && cm.deliveries.length > 0; onTriggered: cm.nowSec = Date.now() / 1000 }
+    onVisibleChanged: if (visible) { nowSec = Date.now() / 1000; oddPlate.view = deliveries.length > 0 ? 2 : 0; seenDeliveries = liveDeliveries.length }
+    function hms(sec) {
+        sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60
+        function two(n) { return (n < 10 ? "0" : "") + n }
+        return h > 0 ? h + ":" + two(m) + ":" + two(x) : m + ":" + two(x)
+    }
+    // Open on DELIVERY when something is coming (or just arrived), otherwise ODD STATS.
+    // A new delivery while the page is open switches over once; after that the pilot's tab choice stands.
+    function showDeliveries() { oddPlate.view = 2 }
+    property int seenDeliveries: 0
     function hereSys(sys) { return String(sys || "").toLowerCase() !== "" && String(sys || "").toLowerCase() === String(bridge.system || "").toLowerCase() }
     function mmss(sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h > 0 ? h + " H " + m + " MIN" : m + " MIN" }
 
@@ -503,42 +525,29 @@ Item {
     // ================================================================= ODD STATS
     // Step 27: cargo and loadout moved to the Flight Deck; this corner shows the
     // weird numbers instead. Elite's own records (Statistics, at login) plus a few the
-    // Bridge counts this session. Shows what fits, then pages through the rest.
+    // Bridge counts this session. 2026-10-28: one scrolling list (no more flipping pages while
+    // you read), bigger and brighter labels and notes.
     Plate {
         id: oddPlate
         objectName: "commanderOddStats"
         x: cm.rightX; y: cm.cargoY; width: cm.rightW; height: cm.cargoH
         screwSize: 13 * cm.s
         readonly property var pool: bridge.commanderOddStats || []
-        readonly property int per: Math.max(1, Math.floor((oBezel.ih - 16 * cm.s) / oBezel.rowH))
-        readonly property int pages: Math.max(1, Math.ceil(pool.length / per))
-        property int page: 0
-        onPagesChanged: if (page >= pages) page = 0
-        readonly property var shown: pool.slice(page * per, page * per + per)
-        property int view: 0          // 2.0.2: 0 odd stats, 1 fleet (stored ships)
-        Dymo { id: oDymo; x: 26 * cm.s; y: 14 * cm.s; text: oddPlate.view === 1 ? "FLEET" : "ODD STATS" }
+        property int view: 0          // 2.0.2: 0 odd stats, 1 fleet (stored ships); 2026-10-25: 2 deliveries, 3 debrief
+        Dymo { id: oDymo; x: 26 * cm.s; y: 14 * cm.s; text: ["ODD STATS", "FLEET", "DELIVERIES", "DEBRIEF"][oddPlate.view] }
         Caption { x: oDymo.x + oDymo.width + 20 * cm.s; anchors.verticalCenter: oDymo.verticalCenter
                   width: oddSel.x - x - 12 * cm.s; elide: Text.ElideRight
-                  text: oddPlate.view === 1 ? (cm.fleet.length > 0 ? cm.fleet.length + " STORED" : "")
-                        : (oddPlate.pages > 1 ? "PAGE " + (oddPlate.page + 1) + " OF " + oddPlate.pages : "") }
+                  text: oddPlate.view === 3 ? ""
+                        : oddPlate.view === 2 ? (bridge.commanderDeliveriesWaiting > 0 ? bridge.commanderDeliveriesWaiting + " COMING" : "")
+                        : oddPlate.view === 1 ? (cm.fleet.length > 0 ? cm.fleet.length + " STORED" : "")
+                        : "" }
         SelectorRow {
             id: oddSel
             anchors.right: parent.right; anchors.rightMargin: 24 * cm.s; y: 10 * cm.s
-            options: ["ODD STATS", "FLEET"]
-            buttonWidth: 118 * cm.s; buttonHeight: 32 * cm.s
+            options: ["ODD STATS", "FLEET", "DELIVERY" + (bridge.commanderDeliveriesWaiting > 0 ? " " + bridge.commanderDeliveriesWaiting : ""), "DEBRIEF"]
+            buttonWidth: 100 * cm.s; buttonHeight: 32 * cm.s
             currentIndex: oddPlate.view
             onPicked: (i) => oddPlate.view = i
-        }
-        Timer {
-            interval: 9000; repeat: true
-            running: oddPlate.visible && oddPlate.view === 0 && oddPlate.pages > 1
-            onTriggered: oddFlip.restart()
-        }
-        SequentialAnimation {
-            id: oddFlip
-            NumberAnimation { target: oList; property: "opacity"; to: 0; duration: 220 }
-            ScriptAction { script: oddPlate.page = (oddPlate.page + 1) % oddPlate.pages }
-            NumberAnimation { target: oList; property: "opacity"; to: 1; duration: 260 }
         }
         Bezel {
             id: oBezel
@@ -548,25 +557,24 @@ Item {
             readonly property real iw: width - pad * 2
             readonly property real ih: height - pad * 2
             readonly property real fs: Math.max(11, 20 * cm.s)
-            readonly property real rowH: fs * 2.55
-            Column {
+            readonly property real rowH: fs * 3.0
+            PhosphorList {
                 id: oList
                 visible: oddPlate.view === 0
-                x: 14 * cm.s; y: 8 * cm.s; width: oBezel.iw - 28 * cm.s
-                Repeater {
-                    model: oddPlate.shown
-                    Item {
-                        required property var modelData
-                        width: oList.width; height: oBezel.rowH
-                        Text { y: 2 * cm.s; width: parent.width * 0.62; elide: Text.ElideRight
-                               text: String(modelData.label) + (modelData.session ? "  // THIS SESSION" : "")
-                               color: modelData.session ? Theme.info : Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.78 }
-                        Text { anchors.right: parent.right; y: 0; width: parent.width * 0.5; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft
-                               text: String(modelData.value); color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 1.35 }
-                        Text { y: oBezel.fs * 1.15; width: parent.width; elide: Text.ElideRight
-                               text: String(modelData.note || ""); color: Theme.phosphor; opacity: 0.6; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.75 }
-                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * cm.s; width: parent.width; height: 1; color: Theme.t("#227dff9c") }
-                    }
+                x: 14 * cm.s; y: 8 * cm.s; width: oBezel.iw - 28 * cm.s; height: oBezel.ih - 16 * cm.s
+                fontSize: oBezel.fs * 0.8
+                model: oddPlate.pool
+                delegate: Item {
+                    required property var modelData
+                    width: oList.list.width - (oList.overflow ? 0 : 26 * cm.s); height: oBezel.rowH
+                    Text { y: 2 * cm.s; width: parent.width * 0.6; elide: Text.ElideRight
+                           text: String(modelData.label) + (modelData.session ? "  // THIS SESSION" : "")
+                           color: modelData.session ? Theme.info : Theme.phosphor; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.98 }
+                    Text { anchors.right: parent.right; y: 0; width: parent.width * 0.42; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft
+                           text: String(modelData.value); color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 1.35 }
+                    Text { y: oBezel.fs * 1.35; width: parent.width; elide: Text.ElideRight
+                           text: String(modelData.note || ""); color: Theme.phosphor; opacity: 0.85; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.88 }
+                    Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 4 * cm.s; width: parent.width; height: 1; color: Theme.t("#227dff9c") }
                 }
             }
             Text { visible: oddPlate.view === 0 && oddPlate.pool.length === 0; anchors.centerIn: parent; width: oBezel.iw - 40 * cm.s
@@ -623,6 +631,122 @@ Item {
                        visible: cm.fleet.length > 0
                        text: String(bridge.commanderFleetStatus) + " // PICK A SHIP, THEN PLOT: SHIP"
                        color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.68 }
+            }
+
+            // ---- DELIVERIES: modules fetched from storage and ships being transferred, soonest first.
+            Item {
+                id: delView
+                visible: oddPlate.view === 2
+                x: 14 * cm.s; y: 8 * cm.s; width: oBezel.iw - 28 * cm.s; height: oBezel.ih - 16 * cm.s
+                readonly property real rowH: oBezel.fs * 2.55
+                PhosphorList {
+                    id: delList
+                    width: parent.width; height: parent.height - delFoot.height - 8 * cm.s
+                    fontSize: oBezel.fs * 0.8
+                    model: cm.deliveries
+                    delegate: Item {
+                        id: drow
+                        required property var modelData
+                        width: delList.list.width; height: delView.rowH
+                        readonly property real remain: Number(modelData.arriveAt) - cm.nowSec
+                        readonly property bool arrived: remain <= 0
+                        readonly property real frac: Number(modelData.total) > 0 ? Math.max(0, Math.min(1, 1 - remain / Number(modelData.total))) : -1
+                        Text { x: 4 * cm.s; y: 2 * cm.s; width: parent.width * 0.62 - x; elide: Text.ElideRight
+                               text: cm.up(modelData.name); color: drow.arrived ? Theme.ok : Theme.phosphor
+                               font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
+                        Text { anchors.right: parent.right; anchors.rightMargin: 6 * cm.s; y: 0; horizontalAlignment: Text.AlignRight
+                               width: parent.width * 0.38
+                               text: drow.arrived ? "ARRIVED" : cm.hms(drow.remain)
+                               color: drow.arrived ? Theme.ok : Theme.info
+                               font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 1.15 }
+                        Text { x: 4 * cm.s; y: oBezel.fs * 1.15; width: parent.width - x - 6 * cm.s; elide: Text.ElideRight
+                               text: (modelData.kind === "SHIP" ? "SHIP" : "MODULE")
+                                     + (String(modelData.detail || "") !== "" ? " // " + cm.up(modelData.detail) : "")
+                                     + " // TO " + cm.up(modelData.station)
+                                     + (cm.hereSys(modelData.system) ? "" : " // " + cm.up(modelData.system))
+                               color: Theme.phosphor; opacity: 0.7; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.72 }
+                        Rectangle { visible: drow.frac >= 0 && !drow.arrived; anchors.bottom: parent.bottom; anchors.bottomMargin: 2 * cm.s
+                                    width: parent.width * drow.frac; height: 3 * cm.s; color: Theme.info; opacity: 0.55 }
+                        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 2 * cm.s; width: parent.width; height: 1; color: Theme.t("#227dff9c") }
+                    }
+                }
+                Text { visible: cm.deliveries.length === 0; anchors.centerIn: delList; width: parent.width - 40 * cm.s
+                       horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+                       text: "NOTHING ON THE WAY // FETCH A MODULE OR TRANSFER A SHIP AND THE COUNTDOWN SHOWS UP HERE"
+                       color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
+                Text { id: delFoot; anchors.bottom: parent.bottom; width: parent.width; elide: Text.ElideRight
+                       visible: cm.deliveries.length > 0
+                       text: "TIMES FROM ELITE // ARRIVED ITEMS CLEAR AFTER 2 HOURS OR WHEN YOU FIT THEM"
+                       color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.68 }
+            }
+
+            // ---- DEBRIEF: one game session summed up from the journal, with plain tips.
+            Item {
+                id: debView
+                visible: oddPlate.view === 3
+                x: 14 * cm.s; y: 8 * cm.s; width: oBezel.iw - 28 * cm.s; height: oBezel.ih - 16 * cm.s
+                readonly property var db: bridge.debrief || ({})
+                readonly property bool hasThis: !!db.this
+                property int which: hasThis ? 0 : 1          // 0 this session, 1 last session
+                readonly property var d: which === 0 ? db.this : db.last
+                function when(d) {
+                    if (!d) return ""
+                    var a = new Date(Number(d.start) * 1000), b = new Date(Number(d.end) * 1000)
+                    function hm(x) { var h = x.getHours(), m = x.getMinutes(); return (h % 12 === 0 ? 12 : h % 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? " AM" : " PM") }
+                    var day = a.toDateString() === new Date().toDateString() ? "TODAY" : a.toLocaleDateString(Qt.locale(), "ddd d MMM").toUpperCase()
+                    return day + "  " + hm(a) + " TO " + hm(b)
+                }
+                Row {
+                    id: debTop
+                    spacing: 8 * cm.s
+                    LitButton { width: 130 * cm.s; height: 30 * cm.s; title: "THIS SESSION"; pip: false; centered: true
+                                on: debView.which === 0; available: debView.hasThis; unavailableReason: "ELITE ISN'T RUNNING"
+                                onActivated: debView.which = 0 }
+                    LitButton { width: 130 * cm.s; height: 30 * cm.s; title: "LAST SESSION"; pip: false; centered: true
+                                on: debView.which === 1; onActivated: debView.which = 1 }
+                }
+                LitButton { anchors.right: parent.right; width: 130 * cm.s; height: 30 * cm.s; title: "READ IT"; pip: false; centered: true
+                            available: !!debView.d; unavailableReason: "NOTHING TO READ YET"
+                            onActivated: bridge.requestCommand(debView.which === 0 ? "debrief_say_this" : "debrief_say_last") }
+                Text { id: debWhen; y: debTop.height + 8 * cm.s; width: parent.width; elide: Text.ElideRight
+                       text: debView.d ? debView.when(debView.d) + (debView.d.ship ? "  //  " + cm.up(debView.d.ship) : "") : ""
+                       color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.75 }
+                Flickable {
+                    id: debFlick
+                    y: debWhen.y + debWhen.height + 6 * cm.s; width: parent.width; height: parent.height - y
+                    contentHeight: debCol.height; clip: true; boundsBehavior: Flickable.StopAtBounds
+                    Column {
+                        id: debCol
+                        width: debFlick.width - 10 * cm.s
+                        spacing: 2 * cm.s
+                        Repeater {
+                            model: debView.d ? debView.d.lines : []
+                            Item {
+                                required property var modelData
+                                width: debCol.width; height: oBezel.fs * 1.25
+                                Text { text: String(modelData.label); color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.8
+                                       anchors.verticalCenter: parent.verticalCenter }
+                                Text { anchors.right: parent.right; width: parent.width * 0.62; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft
+                                       text: String(modelData.value); color: Theme.ok; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.9
+                                       anchors.verticalCenter: parent.verticalCenter }
+                            }
+                        }
+                        Item { width: 1; height: 6 * cm.s }
+                        Repeater {
+                            model: debView.d ? debView.d.tips : []
+                            Text {
+                                required property var modelData
+                                width: debCol.width; wrapMode: Text.WordWrap; bottomPadding: 4 * cm.s
+                                text: "TIP // " + String(modelData).toUpperCase()
+                                color: Theme.info; font.family: Theme.crtFont; font.pixelSize: oBezel.fs * 0.78
+                            }
+                        }
+                    }
+                }
+                Text { visible: !debView.d; anchors.centerIn: debFlick; width: parent.width - 40 * cm.s
+                       horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+                       text: (debView.db.ready === false) ? "READING YOUR JOURNALS..." : "NO GAME SESSION TO SUM UP YET"
+                       color: Theme.dimText; font.family: Theme.crtFont; font.pixelSize: oBezel.fs }
             }
         }
     }

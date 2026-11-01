@@ -2,7 +2,8 @@
 
 Elite AI Bridge is a free, independent Windows companion application for **Elite Dangerous**.
 It turns a second screen into a retro command deck: live ship and game information,
-one-click flight actions, combat, trade, navigation and colonization tools, an in-game
+one-click flight actions, combat, trade, navigation, colonization, mining and engineering
+tools, an in-game
 overlay, a ship voice, and an optional AI co-pilot you talk to with push to talk.
 
 Version 2.0 is a complete redesign of the interface.
@@ -17,6 +18,10 @@ Version 2.0 is a complete redesign of the interface.
 - **Navigation:** follows the route you are flying, with fuel stars and bookmarks.
 - **Colonization:** construction progress, what is left to haul, and where to buy it.
 - **Commander:** ranks, career totals, this session, and a few odd stats.
+- **Mining:** a verdict on every rock you prospect, your haul and where to sell it, ring
+  hotspots near you, and surface mining in the Rhino with your raw materials.
+- **Engineering:** the engineered modules on your ship and in storage, your engineers,
+  and your manufactured and encoded materials.
 - **In-game overlay:** a small click-through panel over Elite (borderless or windowed mode).
 - **Ship voice:** spoken alerts and callouts, generated locally on your PC.
 - **Setup wizard and guided tours:** every page has a short spoken tour on its ? key.

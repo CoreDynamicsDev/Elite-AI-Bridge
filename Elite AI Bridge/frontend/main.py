@@ -18,15 +18,94 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+
+def _runtime_guard() -> None:
+    """2026-10-28 (Lab): the shortcuts start the Bridge with pythonw, which has no window. If a
+    package in the private runtime is missing or broken, the Bridge used to die with nothing on
+    screen. Check first; on a problem open START_HERE.bat in repair mode (a normal window that
+    shows progress) and quit. Inside that repair run (EAB_REPAIR_RUN=1) let the error show in
+    its console instead, so it can't loop."""
+    if os.environ.get("EAB_REPAIR_RUN") == "1":
+        return
+    import importlib.util
+    problem = ""
+    try:
+        for name in ("PySide6", "zmq", "pygame", "sounddevice", "supertonic"):
+            if importlib.util.find_spec(name) is None:
+                problem = name
+                break
+        if not problem:
+            import PySide6.QtCore  # noqa: F401  (loads the Qt DLLs; a broken install fails here)
+    except Exception as exc:  # noqa: BLE001
+        problem = problem or type(exc).__name__
+    if not problem:
+        return
+    bat = Path(__file__).resolve().parent.parent / "START_HERE.bat"
+    if sys.platform == "win32" and bat.exists():
+        try:
+            subprocess.Popen([str(bat), "repair"], cwd=str(bat.parent),
+                             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+        except Exception:
+            pass
+    raise SystemExit(3)
+
+
+_runtime_guard()
+
 from PySide6.QtCore import QObject, Property, QSettings, QTimer, QUrl, Signal, Slot, Qt, QEvent
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QWindow, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWidgets import QApplication
+
+
+def _preload_qt_quick_dlls() -> None:
+    """2.0.4 hotfix (tester's Windows Insider PC): the window "flashed and closed" with
+    "Cannot load library ...qml/QtQuick/qtquick2plugin.dll: The specified module could not be
+    found". The Bridge never imports Qt Quick from Python, so when QML loads its plugins Windows
+    has to find Qt6Quick.dll and friends by itself, and on some PCs that search misses the
+    PySide6 folder. Load those DLLs first by full path; once loaded, every plugin finds them.
+    Harmless where it already worked."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        import importlib
+        import PySide6
+        qt_dir = os.path.dirname(PySide6.__file__)
+        try:
+            os.add_dll_directory(qt_dir)
+        except Exception:
+            pass
+        os.environ["PATH"] = qt_dir + os.pathsep + os.environ.get("PATH", "")
+        for mod in ("PySide6.QtNetwork", "PySide6.QtOpenGL", "PySide6.QtQuick", "PySide6.QtQuickControls2"):
+            try:
+                importlib.import_module(mod)
+            except Exception:
+                pass
+        for name in ("Qt6QmlMeta", "Qt6QmlModels", "Qt6QmlWorkerScript", "Qt6Quick", "Qt6QuickTemplates2",
+                     "Qt6QuickControls2", "Qt6QuickControls2Impl", "Qt6QuickControls2Basic",
+                     "Qt6QuickControls2BasicStyleImpl", "Qt6QuickControls2Fusion", "Qt6QuickControls2FusionStyleImpl",
+                     "Qt6QuickControls2Windows", "Qt6QuickControls2WindowsStyleImpl", "Qt6QuickNativeStyle",
+                     "Qt6QuickControls2FluentWinUI3", "Qt6QuickControls2FluentWinUI3StyleImpl",
+                     "Qt6QuickLayouts", "Qt6QuickDialogs2", "Qt6QuickDialogs2Utils", "Qt6QuickDialogs2QuickImpl",
+                     "Qt6QuickEffects", "Qt6QuickShapes", "Qt6LabsFolderListModel"):
+            path = os.path.join(qt_dir, name + ".dll")
+            if os.path.exists(path):
+                try:
+                    ctypes.WinDLL(path)
+                except OSError as exc:
+                    print(f"[QT PRELOAD] {name}.dll did not load: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[QT PRELOAD] skipped: {exc}", file=sys.stderr)
+
+
+_preload_qt_quick_dlls()
 from boot_splash import BootSplash
 
 INTEGRATION_VERSION = "0.30.20"
 LIVE_COMMANDS = {
     "dock", "launch", "clear", "cancel",
+    "mining_fg_a", "mining_fg_b", "mining_fg_c", "mining_fg_d", "mining_fg_e", "mining_collector", "mining_plot_ring",
     "combat_mode", "combat_enter", "combat_leave",
     "combat_threat", "combat_powerplant", "combat_best_target", "combat_egress",
     "combat_toggle_pips", "combat_toggle_subsystem",
@@ -39,7 +118,7 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.4"
+APP_VERSION = "2.0.5"
 # 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
 # It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
 UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
@@ -49,6 +128,7 @@ UPDATE_CHECK_EVERY_S = 6 * 3600     # 2.0.3: every launch, then every 6 h while 
 NAV_COMMANDS = {"nav_plot", "nav_memory_plot", "nav_memory_set", "nav_memory_capture"}
 ELITE_INPUT_COMMANDS = {
     "dock", "launch", "clear",
+    "mining_fg_a", "mining_fg_b", "mining_fg_c", "mining_fg_d", "mining_fg_e", "mining_collector", "mining_plot_ring",
     "nav_plot", "nav_memory_plot",
     "combat_mode", "combat_enter", "combat_leave", "combat_threat",
     "combat_powerplant", "combat_best_target", "combat_egress",
@@ -58,7 +138,8 @@ ELITE_INPUT_COMMANDS = {
     "combat_firegroup_next", "station_refuel", "station_repair", "station_rearm",
     "trade_buy", "trade_sell", "trade_start",
 }
-RECORD_COMMANDS = {"trade_trip_reset", "save_data", "journal", "diagnostic", "cmdr_refresh"}
+RECORD_COMMANDS = {"trade_trip_reset", "save_data", "journal", "diagnostic", "cmdr_refresh", "mining_reset",
+                   "debrief_say_this", "debrief_say_last"}
 AI_VOICE_COMMANDS = {
     "mic_test", "hearing_test", "mic_hearing_check", "voice_test", "ptt_map",
     "voice_toggle_input_mode", "voice_cycle_level", "voice_cycle_attention", "voice_set_attention",
@@ -609,6 +690,8 @@ class BridgeViewModel(QObject):
             "aiCopilotResponse": "Standing by.",
             "aiToolActivity": "No tools used yet.",
             "aiCommsRows": [],
+            "overlayRows": [],
+            "engineering": {},
             "pageHelpActive": False,
             "pageHelpPage": -1,
             "pageHelpStep": -1,
@@ -1575,7 +1658,7 @@ class BridgeViewModel(QObject):
     @Slot(int)
     def startPageHelp(self, page: int) -> None:
         try:
-            page = max(0, min(12, int(page)))
+            page = max(0, min(14, int(page)))
         except Exception:
             page = 0
         self._executor.submit(self._send_command_worker, "page_help_start", {"page": page})
@@ -1583,7 +1666,7 @@ class BridgeViewModel(QObject):
     @Slot(int, int)
     def startPageHelpFromStep(self, page: int, start_step: int) -> None:
         try:
-            page = max(0, min(12, int(page)))
+            page = max(0, min(14, int(page)))
             start_step = max(0, int(start_step))
         except Exception:
             page, start_step = 0, 0
@@ -1592,7 +1675,7 @@ class BridgeViewModel(QObject):
     @Slot(int, int, int)
     def startPageHelpSegment(self, page: int, start_step: int, end_step: int) -> None:
         try:
-            page = max(0, min(12, int(page)))
+            page = max(0, min(14, int(page)))
             start_step = max(0, int(start_step))
             end_step = max(start_step, int(end_step))
         except Exception:
@@ -1632,7 +1715,7 @@ class BridgeViewModel(QObject):
     @Slot(int, str)
     def setUiContext(self, page: int, workspace: str) -> None:
         try:
-            page = max(0, min(11, int(page)))
+            page = max(0, min(14, int(page)))
         except Exception:
             page = 0
         workspace = str(workspace or "main").strip().lower()[:80]
@@ -2496,6 +2579,19 @@ class BridgeViewModel(QObject):
                               {"commodity": commodity, "quantity": str(max(0, int(quantity or 0)))})
 
     @Slot(int)
+    def plotMiningRing(self, index: int) -> None:
+        """Mining page RINGS NEAR YOU: plot a route to that ring's system."""
+        try:
+            idx = int(index)
+        except Exception:
+            return
+        if idx < 0:
+            return
+        self.commandRequested.emit("mining_plot_ring")
+        self.backend.grant_foreground_permission()
+        self._executor.submit(self._send_command_worker, "mining_plot_ring", {"index": idx})
+
+    @Slot(int)
     def plotResIndex(self, index: int) -> None:
         try:
             idx = int(index)
@@ -3145,6 +3241,16 @@ class BridgeViewModel(QObject):
     @Property(bool, notify=stateChanged)
     def setupAutoPowerPlant(self): return bool(self._get("setupAutoPowerPlant", False))
     @Property(bool, notify=stateChanged)
+    def setupDebriefOnStart(self): return bool(self._get("setupDebriefOnStart", True))
+    @Property(bool, notify=stateChanged)
+    def setupPowerplayCallouts(self): return bool(self._get("setupPowerplayCallouts", False))
+    @Property(str, notify=stateChanged)
+    def egressPhase(self): return str(self._get("egressPhase", "IDLE") or "IDLE")
+    @Property("QVariantMap", notify=stateChanged)
+    def debrief(self):
+        value = self._get("debrief", {})
+        return dict(value) if isinstance(value, dict) else {}
+    @Property(bool, notify=stateChanged)
     def setupAutoChaff(self): return bool(self._get("setupAutoChaff", False))
     @Property(str, notify=stateChanged)
     def setupAutoChaffProfile(self): return _string(self._get("setupAutoChaffProfile"), "MED")
@@ -3166,6 +3272,12 @@ class BridgeViewModel(QObject):
 
     @Property(list, notify=stateChanged)
     def aiCommsRows(self): return list(self._get("aiCommsRows", []) or [])
+
+    @Property(list, notify=stateChanged)
+    def overlayRows(self): return list(self._get("overlayRows", []) or [])
+
+    @Property("QVariantMap", notify=stateChanged)
+    def engineering(self): return dict(self._get("engineering", {}) or {})
 
     @Property(bool, notify=stateChanged)
     def pageHelpActive(self): return bool(self._get("pageHelpActive", False))
@@ -3589,6 +3701,26 @@ class BridgeViewModel(QObject):
     @Property("QVariantList", notify=stateChanged)
     def commanderFleet(self): return list(self._get("commanderFleet", []) or [])
 
+    @Property("QVariantList", notify=stateChanged)
+    def raws(self):
+        value = self._get("raws", [])
+        return list(value) if isinstance(value, list) else []
+
+    @Property("QVariantMap", notify=stateChanged)
+    def mining(self):
+        value = self._get("mining", {})
+        return dict(value) if isinstance(value, dict) else {}
+
+    @Property("QVariantList", notify=stateChanged)
+    def commanderDeliveries(self): return list(self._get("commanderDeliveries", []) or [])
+
+    @Property(int, notify=stateChanged)
+    def commanderDeliveriesWaiting(self):
+        try:
+            return int(self._get("commanderDeliveriesWaiting", 0) or 0)
+        except Exception:
+            return 0
+
     @Property(str, notify=stateChanged)
     def commanderFleetStatus(self): return _string(self._get("commanderFleetStatus"), "READING YOUR JOURNALS...")
 
@@ -3692,7 +3824,10 @@ class BridgeViewModel(QObject):
         if bstate in ("ADAPTER ERROR", "BRIDGE SYSTEMS OFFLINE") or (level == "bad" and not egress):
             return ("FAULT", "BRIDGE FAULT", "NOT YOUR SHIP // CHECK THE BRIDGE")
         if egress:
-            return ("CRITICAL", "EMERGENCY ESCAPE", "GETTING YOU CLEAR // CANCEL TO STOP")
+            phase = str(st.get("egressPhase") or "").upper()
+            detail = {"CLEAR_MASS_LOCK": "MASS LOCKED // BOOSTING CLEAR", "WAIT_FSD": "FSD CHARGING",
+                      "WAIT_SUPERCRUISE": "FSD CHARGING // HOLD COURSE"}.get(phase, "GETTING YOU CLEAR // CANCEL TO STOP")
+            return ("CRITICAL", "EMERGENCY ESCAPE", detail)
         in_ship = str(st.get("pilotPlace") or "SHIP").upper() == "SHIP"
         ship = (str(st.get("shipName") or ""), str(st.get("shipModel") or ""))
         dropped = self._shields_up_ship is not None and self._shields_up_ship == ship

@@ -53,6 +53,201 @@ except Exception:
 
 import EliteAIBridge_v0_12_95 as legacy
 
+# 2026-10-25 Fire group select. Elite only has Next / Previous fire group keys, so
+# these Bridge hotkeys read the current group from Status.json and step to the one
+# asked for. Letters match what the game shows (A = first group).
+_FIRE_GROUP_LETTERS = "ABCDEFGH"
+_FIRE_GROUP_HOTKEY_SPECS = tuple(
+    (f"fire_group_select_{letter.lower()}", f"Ctrl+Alt+Shift+F{i + 1}", 0x70 + i, f"Fire Group {letter}")
+    for i, letter in enumerate(_FIRE_GROUP_LETTERS)
+)
+if not any(str(row[0]).startswith("fire_group_select_") for row in legacy.BRIDGE_HOTKEY_SPECS):
+    legacy.BRIDGE_HOTKEY_SPECS = tuple(legacy.BRIDGE_HOTKEY_SPECS) + _FIRE_GROUP_HOTKEY_SPECS
+_FIRE_GROUP_WORDS = {
+    "a": 0, "ay": 0, "alpha": 0, "one": 0, "1": 0,
+    "b": 1, "be": 1, "bee": 1, "bravo": 1, "two": 1, "2": 1,
+    "c": 2, "see": 2, "sea": 2, "charlie": 2, "three": 2, "3": 2,
+    "d": 3, "dee": 3, "delta": 3, "four": 3, "4": 3,
+    "e": 4, "echo": 4, "five": 4, "5": 4,
+    "f": 5, "foxtrot": 5, "six": 5, "6": 5,
+    "g": 6, "gee": 6, "golf": 6, "seven": 6, "7": 6,
+    "h": 7, "hotel": 7, "eight": 7, "8": 7,
+}
+
+
+# ---- Voice variety (2026-10-25) --------------------------------------------------
+# Common ship voice lines get several wordings. Each group plays its wordings in a shuffled
+# order and never repeats the last one, so a long session doesn't say the same sentence over
+# and over. Warnings (shields, hull, heat, interdiction, death) are never reworded.
+import random as _random
+_VARY_STATE = {}
+
+
+def _vary(group, options):
+    options = [o for o in options if o]
+    if len(options) <= 1:
+        return options[0] if options else ""
+    st = _VARY_STATE.setdefault(group, {"bag": [], "last": None})
+    if not st["bag"]:
+        bag = list(range(len(options)))
+        _random.shuffle(bag)
+        if bag[0] == st["last"]:
+            bag.append(bag.pop(0))
+        st["bag"] = bag
+    i = st["bag"].pop(0)
+    st["last"] = i
+    return options[min(i, len(options) - 1)]
+
+
+def _vary_fmt(group, templates, **vals):
+    return _vary(group, templates).format(**vals)
+
+
+# (kinds, pattern, group, templates). Templates use the pattern's named groups.
+_VOICE_VARIANTS = [
+    ({"DOCKING"}, re.compile(r"^Docking permission granted at (?P<station>.+?)\. Landing pad (?P<pad>\d+)\.$"), "dock-granted", [
+        "Docking permission granted at {station}. Landing pad {pad}.",
+        "Docking granted. Pad {pad}.",
+        "We're cleared to land. Pad {pad}.",
+        "{station} says yes. Pad {pad}.",
+        "Permission granted. Head for pad {pad}.",
+    ]),
+    ({"DOCKED"}, re.compile(r"^(?:Docked at (?P<a>.+?)\.|Arrived at (?P<b>.+?) in .+?\. Docking complete\.)$"), "docked", [
+        "Docked at {station}.",
+        "We're down at {station}.",
+        "Clamps engaged. Welcome to {station}.",
+        "Docked. {station}.",
+        "Safe at {station}.",
+    ]),
+    ({"TRAVEL"}, re.compile(r"^Departed (?P<station>.+?)\.$"), "undocked", [
+        "Departed {station}.",
+        "We're clear of {station}.",
+        "Leaving {station}.",
+        "Off the pad. {station} behind us.",
+    ]),
+    ({"TRAVEL"}, re.compile(r"^Supercruise exit at (?P<body>.+?)\.$"), "sc-exit", [
+        "Supercruise exit at {body}.",
+        "Dropped out at {body}.",
+        "Out of supercruise. {body}.",
+        "Arrived at {body}.",
+    ]),
+    ({"TRAVEL"}, re.compile(r"^Touchdown confirmed(?: on (?P<body>.+?))?\.$"), "touchdown", [
+        "Touchdown confirmed.",
+        "We're down.",
+        "Landing gear on the ground.",
+        "Touchdown.",
+    ]),
+    ({"TRAVEL"}, re.compile(r"^Liftoff confirmed\.$"), "liftoff", [
+        "Liftoff confirmed.",
+        "We're off the ground.",
+        "Liftoff.",
+        "Wheels up.",
+    ]),
+    ({"COMBAT"}, re.compile(r"^(?P<target>.+?) destroyed\. Bounty (?P<bounty>.+?)\.$"), "bounty", [
+        "{target} destroyed. Bounty {bounty}.",
+        "{target} down. {bounty} bounty.",
+        "Kill confirmed. Bounty {bounty}.",
+        "That's {bounty} on the books.",
+        "{target} is scrap. Bounty {bounty}.",
+    ]),
+    ({"MISSION"}, re.compile(r"^Mission completed: (?P<name>.+?)\.(?P<rest>.*)$"), "mission-done", [
+        "Mission completed: {name}.{rest}",
+        "Mission done: {name}.{rest}",
+        "Mission complete: {name}.{rest}",
+        "Job done: {name}.{rest}",
+    ]),
+]
+
+
+def _voice_variant(text, kind):
+    k = str(kind or "").upper()
+    for kinds, rx, group, templates in _VOICE_VARIANTS:
+        if k not in kinds:
+            continue
+        m = rx.match(text)
+        if not m:
+            continue
+        vals = {n: (v or "") for n, v in m.groupdict().items()}
+        if group == "docked":
+            vals["station"] = vals.get("a") or vals.get("b") or "the station"
+        if group == "touchdown" and vals.get("body"):
+            templates = templates + ["Touchdown on {body}."]
+        try:
+            return _vary_fmt(group, templates, **vals)
+        except Exception:
+            return text
+    return text
+
+
+# 2026-10-27 Auto Pips MINING profile: 2 SYS / 0 ENG / 4 WEP while mining (hardpoints out on a
+# ship with mining tools, no fight going on). Lasers get the full capacitor, shields keep two pips.
+# From reset 2/2/2 in half-pips (4,4,4): SYS (6,3,3), WEP (5,2,5), WEP (4,1,7), SYS (6,0,6),
+# WEP with ENG empty takes both halves from SYS (4,0,8). The engine verifies before it trusts it.
+legacy.DYNAMIC_PIP_PRESETS.setdefault("MINING", {
+    "sequence": (("IncreaseSystemsPower", 1), ("IncreaseWeaponsPower", 2), ("IncreaseSystemsPower", 1),
+                 ("IncreaseWeaponsPower", 1)),
+    "expected": [4, 0, 8],
+    "display": "2 SYS / 0 ENG / 4 WEP",
+})
+
+def _raw_targets_clean(value):
+    """Raw material targets: "Iron:150,Nickel:100" or {"Iron": 150} -> {"Iron": 150}. 1..300, at most 28."""
+    out = {}
+    items = value.items() if isinstance(value, dict) else (
+        [p.split(":", 1) for p in str(value or "").split(",") if ":" in p])
+    for k, v in items:
+        try:
+            n = int(float(str(v).strip()))
+        except Exception:
+            continue
+        k = str(k).strip().title()[:30]
+        if k and 1 <= n <= 300:
+            out[k] = n
+    return dict(list(out.items())[:28])
+
+
+def _hotspot_key(name):
+    """Compare hotspot names with commodity names: 'Low Temperature Diamonds' == 'LowTemperatureDiamond'."""
+    k = re.sub(r"[^a-z0-9]", "", str(name or "").lower())
+    return k[:-1] if k.endswith("s") else k
+
+
+_MINING_EVENTS = {"LoadGame", "ProspectedAsteroid", "MiningRefined", "LaunchDrone", "AsteroidCracked", "Scan", "SAASignalsFound",
+                  "LaunchSRV", "DockSRV", "SRVDestroyed", "Location", "Cargo", "MaterialCollected",
+                  "ApproachBody", "LeaveBody", "Touchdown"}   # SRV / Rhino (2026-10-27)
+_RHINO_HOLD = 72        # Rhino cargo, tons (ED Field Manual)
+_RHINO_BURST_S = 15     # MiningRefined this close together while driving = one rig collection
+_RING_CLASS = {"metalrich": "METAL RICH", "metalic": "METALLIC", "metallic": "METALLIC", "icy": "ICY", "rocky": "ROCKY"}
+_RING_RESERVE = {"pristineresources": "PRISTINE", "majorresources": "MAJOR", "commonresources": "COMMON",
+                 "lowresources": "LOW", "depletedresources": "DEPLETED"}
+
+
+def _ring_rows_from_scan(e, fallback_system=""):
+    out = []
+    reserve = _RING_RESERVE.get(str(e.get("ReserveLevel") or "").lower(), "")
+    system = str(e.get("StarSystem") or fallback_system or "-")
+    for r in e.get("Rings") or []:
+        name = str((r or {}).get("Name") or "")
+        if not name or "belt" in name.lower():
+            continue
+        cls = str(r.get("RingClass") or "").replace("eRingClass_", "").lower()
+        try:
+            ls = int(round(float(e.get("DistanceFromArrivalLS") or 0)))
+        except Exception:
+            ls = -1
+        out.append({"ring": name, "system": system, "cls": _RING_CLASS.get(cls, cls.upper()), "reserve": reserve, "ls": ls})
+    return out
+
+
+def _ring_hotspots(e):
+    hot = {}
+    for sgn in e.get("Signals") or []:
+        try:
+            hot[str(sgn.get("Type_Localised") or sgn.get("Type") or "?")] = int(sgn.get("Count") or 0)
+        except Exception:
+            continue
+    return hot
+
 
 class _QmlEliteState(legacy.EliteState):
     """Commander page extras the engine reads past: Statistics (Elite's own career
@@ -67,6 +262,10 @@ class _QmlEliteState(legacy.EliteState):
             ev = e.get("event")
             if not seed:
                 self._qml_odd_count(e, ev)
+            if ev in _MINING_EVENTS:
+                self._qml_mining_event(e, ev, seed)
+            if ev in ("EngineerCraft", "Synthesis", "TechnologyBroker", "MaterialTrade", "MissionCompleted"):
+                self._qml_material_spend(e, ev)
             if ev == "Statistics":
                 self.qml_statistics = dict(e)
             elif ev == "Reputation":
@@ -76,7 +275,11 @@ class _QmlEliteState(legacy.EliteState):
                 if key:
                     old = getattr(self, "qml_promotion", None) or {}
                     self.qml_promotion = {"serial": int(old.get("serial", 0)) + 1, "key": key, "rank": e.get(key)}
-            elif ev == "Loadout":
+            elif ev in ("EngineerProgress", "Materials", "StoredModules"):
+                self._qml_engineering_event(e, ev)
+            if ev == "Loadout":
+                self.qml_engineered = _qml_engineered_rows(e.get("Modules"))
+            if ev == "Loadout":
                 self.qml_ship_ident = str(e.get("ShipIdent") or "").strip()
                 self.ship_name = str(e.get("ShipName") or "").strip()
                 try:
@@ -84,9 +287,207 @@ class _QmlEliteState(legacy.EliteState):
                 except Exception:
                     self.qml_rebuy = 0
                 self.qml_loadout = _qml_loadout_rows(e.get("Modules"))
+                self.qml_loadout_items = [str((m or {}).get("Item") or "").lower() for m in (e.get("Modules") or []) if isinstance(m, dict)]
         except Exception:
             pass
         return result
+
+    def _qml_engineering_event(self, e, ev):
+        """ENGINEERING page (2026-10-28): engineers, material categories, stored engineered modules."""
+        if ev == "EngineerProgress":
+            eng = dict(getattr(self, "qml_engineers", None) or {})
+            rows = e.get("Engineers") if isinstance(e.get("Engineers"), list) else [e]
+            for r in rows:
+                name = str((r or {}).get("Engineer") or "").strip()
+                if not name:
+                    continue
+                old = eng.get(name, {})
+                eng[name] = {"name": name, "progress": str(r.get("Progress") or old.get("progress") or ""),
+                             "rank": int(r.get("Rank") if r.get("Rank") is not None else old.get("rank", 0) or 0),
+                             "rankProgress": int(r.get("RankProgress") or 0)}
+            self.qml_engineers = eng
+        elif ev == "Materials":
+            cat = {}
+            for c in ("Raw", "Manufactured", "Encoded"):
+                for r in e.get(c) or []:
+                    k = str((r or {}).get("Name") or "").strip().casefold()
+                    if k:
+                        cat[k] = c
+            self.qml_material_category = cat
+        elif ev == "StoredModules":
+            out = []
+            for it in e.get("Items") or []:
+                if not isinstance(it, dict) or not it.get("EngineerModifications"):
+                    continue
+                row = _qml_module_row("Slot1", it.get("Name"), {"Level": it.get("Level")}) or {}
+                out.append({"name": str(row.get("name") or legacy.pretty_name(it.get("Name_Localised") or it.get("Name") or "")).upper(),
+                            "rating": row.get("rating", ""), "blueprint": _qml_blueprint_name(it.get("EngineerModifications")),
+                            "level": int(it.get("Level") or 0), "quality": float(it.get("Quality") or 0),
+                            "where": str(it.get("StarSystem") or ("IN TRANSIT" if it.get("InTransit") else "")),
+                            "experimental": "", "engineer": ""})
+            self.qml_stored_engineered = out
+
+    def _qml_material_spend(self, e, ev):
+        """Engineering, trades and synthesis use materials; the .95 count only went up."""
+        def take(name, n):
+            try:
+                self._adjust_material_inventory(name, -abs(int(n or 0)))
+            except Exception:
+                pass
+        if ev == "EngineerCraft":
+            for i in e.get("Ingredients") or []:
+                take(i.get("Name"), i.get("Count"))
+        elif ev in ("Synthesis", "TechnologyBroker"):
+            for i in e.get("Materials") or []:
+                take(i.get("Name"), i.get("Count"))
+        elif ev == "MaterialTrade":
+            paid, got = e.get("Paid") or {}, e.get("Received") or {}
+            take(paid.get("Material"), paid.get("Quantity"))
+            try:
+                self._adjust_material_inventory(got.get("Material"), abs(int(got.get("Quantity") or 0)))
+            except Exception:
+                pass
+        elif ev == "MissionCompleted":
+            for i in e.get("MaterialsReward") or []:
+                try:
+                    self._adjust_material_inventory(i.get("Name"), abs(int(i.get("Count") or 0)))
+                except Exception:
+                    pass
+
+    def _qml_mining_event(self, e, ev, seed=False):
+        """2026-10-25 MINING page: prospector results, refined tons and limpets used, for this game
+        session (the current journal is replayed at startup, so a Bridge restart keeps the run)."""
+        m = getattr(self, "qml_mining", None)
+        if m is None or ev == "LoadGame":
+            m = self.qml_mining = {"rocks": [], "refined": {}, "first": 0.0, "last": 0.0, "log": [],
+                                   "prospectors": 0, "collectors": 0, "cracked": 0, "rings": {}, "hot": {}}
+            if ev == "LoadGame":
+                # loading straight into an SRV ("Ship": "MEV_Rhino" / "TestBuggy")
+                ship = str(e.get("Ship") or "").lower()
+                srv = m["srv"] = self._qml_srv_blank()
+                srv["in"] = ship.startswith("mev_") or ship in ("testbuggy", "combat_multicrew_srv_01")
+                srv["rhino"] = "rhino" in ship
+                return
+        ts = _ColonySiteScanner._epoch(e.get("timestamp"))
+        srv = m.get("srv")
+        if srv is None:
+            srv = m["srv"] = self._qml_srv_blank()
+        # ---- SRV / Rhino surface mining (2026-10-27). The game writes nothing for rigs; a rig
+        # collection shows up as a quick burst of MiningRefined (one per ton) while driving.
+        if ev == "LaunchSRV":
+            t = str(e.get("SRVType") or "").lower()
+            srv.update({"in": True, "rhino": "rhino" in t, "launched": ts,
+                        "name": str(e.get("SRVType_Localised") or "SRV").replace("SRV ", "").upper()})
+            return
+        if ev in ("DockSRV", "SRVDestroyed"):
+            srv["in"] = False
+            srv["cargo"] = 0
+            return
+        if ev in ("ApproachBody", "Touchdown"):
+            self.qml_body = str(e.get("Body") or "")
+            return
+        if ev == "LeaveBody":
+            self.qml_body = ""
+            return
+        if ev == "Location":
+            if e.get("InSRV") is not None:
+                srv["in"] = bool(e.get("InSRV"))
+            self.qml_body = str(e.get("Body") or "") if str(e.get("BodyType") or "") == "Planet" else ""
+            return
+        if ev == "Cargo":
+            if str(e.get("Vessel") or "") == "SRV":
+                try:
+                    srv["cargo"] = int(e.get("Count") or 0)
+                except Exception:
+                    pass
+            return
+        if ev == "MaterialCollected":
+            if srv.get("in") and str(e.get("Category") or "") == "Raw":
+                nm = str(e.get("Name_Localised") or e.get("Name") or "?").title()
+                srv["raws"][nm] = srv["raws"].get(nm, 0) + int(e.get("Count") or 1)
+            return
+        if ev == "MiningRefined" and srv.get("in"):
+            name = str(e.get("Type_Localised") or e.get("Type") or "?")
+            srv["refined"][name] = srv["refined"].get(name, 0) + 1
+            srv["first"] = srv["first"] or ts
+            srv["last"] = ts
+            cols = srv["collections"]
+            if cols and ts - float(cols[0]["last"]) <= _RHINO_BURST_S:
+                cols[0]["items"][name] = cols[0]["items"].get(name, 0) + 1
+                cols[0]["last"] = ts
+            else:
+                srv["seq"] = int(srv.get("seq", 0)) + 1
+                cols.insert(0, {"ts": ts, "last": ts, "items": {name: 1}, "seq": srv["seq"], "live": not seed})
+                del cols[30:]
+            return
+        if ev == "SAASignalsFound":
+            n = sum(int(x.get("Count") or 0) for x in (e.get("Signals") or [])
+                    if "planetarymininglocation" in str(x.get("Type") or "").lower())
+            if n:
+                locs = getattr(self, "qml_mining_locs", None)
+                if locs is None:
+                    locs = self.qml_mining_locs = {}
+                body = str(e.get("BodyName") or "?")
+                fresh = body not in locs
+                locs[body] = n
+                if fresh and not seed:
+                    self.qml_mining_locs_said = (body, n, ts)
+        if ev == "ProspectedAsteroid":
+            mats = []
+            for x in e.get("Materials") or []:
+                try:
+                    nm = str(x.get("Name_Localised") or x.get("Name") or "?")
+                    if nm.islower():
+                        nm = nm.title()      # some materials come without a localised name ("silver")
+                    mats.append({"name": nm, "pct": round(float(x.get("Proportion") or 0), 1)})
+                except Exception:
+                    continue
+            mats.sort(key=lambda r: -r["pct"])
+            content = str(e.get("Content_Localised") or e.get("Content") or "")
+            level = "HIGH" if "high" in content.lower() else ("LOW" if "low" in content.lower() else "MEDIUM")
+            mother = str(e.get("MotherlodeMaterial_Localised") or e.get("MotherlodeMaterial") or "")
+            try:
+                remaining = round(float(e.get("Remaining", 100) or 0), 0)
+            except Exception:
+                remaining = 100.0
+            m["seq"] = int(m.get("seq", 0)) + 1
+            m["rocks"].insert(0, {"ts": ts, "content": level, "materials": mats, "motherlode": mother, "remaining": remaining,
+                                  "seq": m["seq"], "live": not seed})
+            del m["rocks"][60:]
+            # THIS RUN log: one row per rock, refined tons grouped between rocks
+            log = m.setdefault("log", [])
+            log.insert(0, {"kind": "rock", "ts": ts, "content": level, "materials": [dict(x) for x in mats], "motherlode": mother})
+            del log[40:]
+        elif ev == "MiningRefined":
+            name = str(e.get("Type_Localised") or e.get("Type") or "?")
+            m["refined"][name] = m["refined"].get(name, 0) + 1
+            log = m.setdefault("log", [])
+            if log and log[0].get("kind") == "refined":
+                log[0]["items"][name] = log[0]["items"].get(name, 0) + 1
+                log[0]["ts"] = ts
+            else:
+                log.insert(0, {"kind": "refined", "ts": ts, "items": {name: 1}})
+                del log[40:]
+            m["first"] = m["first"] or ts
+            m["last"] = ts
+        elif ev == "LaunchDrone":
+            kind = str(e.get("Type") or "").lower()
+            if kind == "prospector":
+                m["prospectors"] += 1
+            elif kind == "collection":
+                m["collectors"] += 1
+        elif ev == "AsteroidCracked":
+            m["cracked"] += 1
+        elif ev == "Scan" and e.get("Rings"):
+            for r in _ring_rows_from_scan(e, getattr(self, "system", "")):
+                m["rings"][r["ring"]] = r
+        elif ev == "SAASignalsFound" and str(e.get("BodyName") or "").endswith("Ring"):
+            m["hot"][str(e.get("BodyName"))] = _ring_hotspots(e)
+
+    @staticmethod
+    def _qml_srv_blank():
+        return {"in": False, "rhino": False, "name": "", "cargo": 0, "refined": {}, "raws": {}, "collections": [],
+                "first": 0.0, "last": 0.0, "seq": 0, "launched": 0.0}
 
     def _qml_odd_count(self, e, ev):
         """Session counts for Commander > ODD STATS (live events only, never the startup replay)."""
@@ -285,6 +686,46 @@ def _qml_module_row(slot, item, engineering=None):
     return {"group": group, "name": name, "rating": rating, "note": note}
 
 
+_BLUEPRINT_PREFIXES = ("Armour_", "Engine_", "FSD_", "PowerPlant_", "PowerDistributor_", "ShieldGenerator_", "ShieldBooster_",
+                       "Sensor_", "LifeSupport_", "Weapon_", "Misc_", "HullReinforcement_", "ShieldCellBank_", "Refineries_",
+                       "FSDinterdictor_", "CollectionLimpet_", "ProspectingLimpet_", "FuelTransferLimpet_", "HatchBreaker_",
+                       "Mining_", "Kinetic_", "Thermal_", "Explosive_", "Heavy_", "Chaff_", "HeatSink_", "ECM_", "PointDefence_",
+                       "ShieldBoosterBlueprints_", "Sensor_Sensor_")
+
+
+def _qml_blueprint_name(raw):
+    """'FSD_LongRange' -> 'LONG RANGE', 'Weapon_HighCapacity' -> 'HIGH CAPACITY'."""
+    t = str(raw or "")
+    for p in _BLUEPRINT_PREFIXES:
+        if t.lower().startswith(p.lower()):
+            t = t[len(p):]
+            break
+    t = t.replace("_", " ")
+    t = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t)
+    return t.upper().strip()
+
+
+def _qml_engineered_rows(modules):
+    """This ship's engineered modules from Loadout: slot name, rating, blueprint, grade, quality, experimental."""
+    out = []
+    for mod in modules or []:
+        if not isinstance(mod, dict):
+            continue
+        eng = mod.get("Engineering")
+        if not isinstance(eng, dict) or not eng.get("BlueprintName"):
+            continue
+        row = _qml_module_row(mod.get("Slot"), mod.get("Item"), eng) or {}
+        out.append({"name": str(row.get("name") or legacy.pretty_name(mod.get("Item") or "")).upper(),
+                    "rating": row.get("rating", ""), "group": row.get("group", ""),
+                    "blueprint": _qml_blueprint_name(eng.get("BlueprintName")), "level": int(eng.get("Level") or 0),
+                    "quality": float(eng.get("Quality") or 0),
+                    "experimental": str(eng.get("ExperimentalEffect_Localised") or "").upper(),
+                    "engineer": str(eng.get("Engineer") or "").upper(), "where": ""})
+    order = {"CORE": 0, "OPTIONAL": 1, "HARDPOINTS": 2, "UTILITY": 3}
+    out.sort(key=lambda r: (order.get(r["group"], 9), r["name"]))
+    return out
+
+
 def _qml_loadout_rows(modules):
     rows = []
     if not isinstance(modules, list):
@@ -333,7 +774,7 @@ Elite AI Bridge QML guidance rules:
 - For explicit cockpit-state requests such as night vision, lights, landing gear, cargo scoop, hardpoints, flight assist, silent running, or Combat/Analysis HUD mode, use set_cockpit_control. Never invent a raw key. Bridge resolves the active Elite keyboard binding and verifies the resulting Status.json state.
 - For throttle presets and one-shot cockpit commands, use perform_cockpit_action. Examples: "half speed" or "50 percent throttle" = throttle_50; "full speed" = throttle_100; "all stop" = throttle_0; boost, chaff, heat sink, shield cell, targeting, fire-group cycling, radar range, maps, FSD/supercruise, wing orders, and fighter orders also use perform_cockpit_action. Bridge always resolves the commander's CURRENT Elite .binds entry at execution time.
 - For direct distributor requests such as "full power to shields", "power to weapons", "full engines", or "balance pips", use set_power_distribution. A direct pilot PIP request temporarily overrides Dynamic PIPs so automation does not fight the commander. "Resume Auto Pips" clears that manual override and re-enables Dynamic PIPs if needed.
-- When the commander says "find the best target", use find_best_target. This is a two-pass survey, not a full scan of every contact: first cycle a bounded full target list and record early ship type plus any legal status Elite already knows, then rank all observed candidates and cycle again to reacquire the winner. CLEAN contacts are invalid and must be skipped; WANTED contacts are preferred. Do not stop at the first Python/Anaconda.
+- When the commander says "find the best target", use find_best_target. This is a two-pass survey, not a full scan of every contact: first cycle a bounded full target list and record early ship type plus any legal status Elite already knows, then rank all observed candidates and cycle again to reacquire the winner. CLEAN contacts are invalid and must be skipped; WANTED contacts are preferred. Do not stop at the first Python/Anaconda. The tool returns as soon as the sweep starts; the ship voice announces the pick and whether it is wanted, so do not repeat or guess the result. "Scan again", "next target" or "find another" after a sweep means call find_best_target again: ships already found clean are skipped.
 - When the commander is DOCKED, plain departure language such as "launch", "take off", "depart", "leave the station", or "get us out of here" means Auto Launch now. Do not ask whether the commander means launch when docked.
 - "Clear and jump" means run Clear Station + FSD now. Only phrases that explicitly say automatic/automatically/after launch/session rule should change the Clear + Jump After Launch setting.
 - In supercruise with an SCO-capable FSD, "SCO", "engage SCO", "overcharge", or "supercruise overcharge" means perform the sco cockpit action, which uses the commander's CURRENT UseBoostJuice binding.
@@ -1677,7 +2118,7 @@ BACKEND_VERSION = "0.12.95"
 # active .binds profile. Search/configuration/diagnostic commands remain usable
 # on a clean PC so Bridge never locks the user out of the interface.
 ELITE_CONTROL_COMMANDS = {
-    "dock", "launch", "clear",
+    "dock", "launch", "clear", "mining_collector", "mining_plot_ring",
     "nav_plot", "nav_memory_plot",
     "combat_mode", "combat_enter", "combat_leave", "combat_threat",
     "combat_powerplant", "combat_best_target", "combat_egress",
@@ -2035,7 +2476,7 @@ class _ColonySiteScanner:
     journal is followed for new lines. Depot numbers are as of the last visit.
     """
     STALE_DAYS = 30
-    LINE_RX = re.compile(rb'^[^\n]*"event"\s*:\s*"(?:Colonisation\w+|Docked|Location|FSDJump|CarrierJump|FSSSignalDiscovered|StoredShips|Shipyard\w+|SellShipOnRebuy|Loadout)"[^\n]*$', re.M)
+    LINE_RX = re.compile(rb'^[^\n]*"event"\s*:\s*"(?:Colonisation\w+|Docked|Location|FSDJump|CarrierJump|FSSSignalDiscovered|StoredShips|Shipyard\w+|SellShipOnRebuy|Loadout|FetchRemoteModule|StoredModules|ModuleRetrieve|ModuleSellRemote|Scan|SAASignalsFound)"[^\n]*$', re.M)
 
     def __init__(self, journal_dir):
         self.journal_dir = Path(journal_dir)
@@ -2057,6 +2498,14 @@ class _ColonySiteScanner:
         self.ship_names: dict[int, dict] = {}    # ship id -> name / ident / value from Loadout
         self.current_ship_id = None
         self.fleet_ts = ""                       # last StoredShips snapshot
+        # 2026-10-25 DELIVERIES (Commander page): modules on their way (FetchRemoteModule),
+        # cleared when retrieved, sold, or a later StoredModules shows them arrived.
+        self.module_transfers: dict[int, dict] = {}   # storage slot -> {name, eng, marketId, start, arrive}
+        self.module_info: dict[int, dict] = {}        # storage slot -> engineering from the last StoredModules
+        # 2026-10-25 MINING: every planetary ring seen in a Scan, plus hotspots from ring mapping
+        self.rings: dict[str, dict] = {}
+        self.ring_hot: dict[str, dict] = {}
+        self.cur_system = ""
 
     @staticmethod
     def _key(name):
@@ -2076,6 +2525,21 @@ class _ColonySiteScanner:
         if ev in ("StoredShips", "Loadout", "SellShipOnRebuy") or str(ev).startswith("Shipyard"):
             self._fleet_event(ev, e, ts)
             return
+        if ev in ("FetchRemoteModule", "StoredModules", "ModuleRetrieve", "ModuleSellRemote"):
+            self._module_event(ev, e, ts)
+            return
+        if ev == "Scan":
+            if e.get("Rings"):
+                for r in _ring_rows_from_scan(e, self.cur_system):
+                    self.rings[r["ring"]] = r
+            return
+        if ev == "SAASignalsFound":
+            body = str(e.get("BodyName") or "")
+            if body.endswith("Ring"):
+                self.ring_hot[body] = _ring_hotspots(e)
+            return
+        if ev in ("FSDJump", "Location", "CarrierJump") and e.get("StarSystem"):
+            self.cur_system = str(e.get("StarSystem"))
         if ev in ("FSDJump", "Location", "CarrierJump"):
             pos = e.get("StarPos")
             name = e.get("StarSystem")
@@ -2217,6 +2681,7 @@ class _ColonySiteScanner:
                 old = self.ships.get(sid) or {}
                 if old.get("arrive", 0) and old.get("marketId") == row["marketId"]:
                     row["arrive"] = old["arrive"]
+                    row["start"] = old.get("start", 0)
             self.ships = ships
             self.fleet_ts = ts
             return
@@ -2246,8 +2711,108 @@ class _ColonySiteScanner:
             self._store_ship(sid, e.get("ShipType"), self._int(e.get("MarketID")), ts, e.get("ShipType_Localised") or "")
             try:
                 self.ships[sid]["arrive"] = self._epoch(ts) + float(e.get("TransferTime") or 0)
+                self.ships[sid]["start"] = self._epoch(ts)
             except Exception:
                 pass
+
+    # ---- DELIVERIES ------------------------------------------------------------
+    @staticmethod
+    def _eng_text(item):
+        blue = str((item or {}).get("EngineerModifications") or "")
+        if not blue:
+            return ""
+        nice = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", blue.split("_", 1)[-1]).upper()
+        level = (item or {}).get("Level")
+        return f"G{level} {nice}" if level else nice
+
+    def _module_event(self, ev, e, ts):
+        if ev == "FetchRemoteModule":
+            slot = self._int(e.get("StorageSlot"))
+            if slot is None:
+                return
+            start = self._epoch(ts)
+            try:
+                secs = float(e.get("TransferTime") or 0)
+            except Exception:
+                secs = 0.0
+            name = str(e.get("StoredItem_Localised") or e.get("StoredItem") or "Module")
+            info = self.module_info.get(slot) or {}
+            self.module_transfers[slot] = {
+                "name": name, "eng": info.get("eng", ""), "marketId": self.current_market,
+                "start": start, "arrive": start + secs if start > 0 else 0.0,
+            }
+        elif ev in ("ModuleRetrieve", "ModuleSellRemote"):
+            self.module_transfers.pop(self._int(e.get("StorageSlot")), None)
+        elif ev == "StoredModules":
+            info = {}
+            moving = set()
+            for item in e.get("Items") or []:
+                slot = self._int(item.get("StorageSlot"))
+                if slot is None:
+                    continue
+                info[slot] = {"eng": self._eng_text(item)}
+                if item.get("InTransit"):
+                    moving.add(slot)
+            self.module_info = info
+            # anything we were tracking that Elite no longer lists as moving has arrived (or is gone)
+            for slot in list(self.module_transfers):
+                if slot not in moving:
+                    row = self.module_transfers[slot]
+                    if slot not in info:
+                        self.module_transfers.pop(slot, None)
+                    elif row.get("arrive", 0) > self._epoch(ts):
+                        row["arrive"] = self._epoch(ts)   # Elite says it's here already
+
+    def delivery_rows(self, keep_after=7200.0):
+        """Modules and ships on their way here, soonest first. Arrived ones stay listed for keep_after seconds."""
+        now = time.time()
+        with self.lock:
+            mods = {k: dict(v) for k, v in self.module_transfers.items()}
+            ships = {k: dict(v) for k, v in self.ships.items()}
+            names = {k: dict(v) for k, v in self.ship_names.items()}
+            current = self.current_ship_id
+        out = []
+        for slot, m in mods.items():
+            arrive = float(m.get("arrive") or 0)
+            if arrive <= 0 or now - arrive > keep_after:
+                continue
+            where = self.dock.get(m.get("marketId")) or {}
+            out.append({"key": f"m{slot}", "kind": "MODULE", "name": m.get("name") or "Module", "detail": m.get("eng") or "",
+                        "station": where.get("station") or "-", "system": where.get("system") or "-",
+                        "arriveAt": int(arrive), "total": int(max(0.0, arrive - float(m.get("start") or arrive)))})
+        for sid, sh in ships.items():
+            if sid == current:
+                continue
+            arrive = float(sh.get("arrive") or 0)
+            if arrive <= 0 or now - arrive > keep_after:
+                continue
+            known = names.get(sid) or {}
+            where = self.dock.get(sh.get("marketId")) or {}
+            nm = (sh.get("name") or known.get("name") or "").strip()
+            out.append({"key": f"s{sid}", "kind": "SHIP", "name": nm or sh.get("typeName") or sh.get("type") or "Ship",
+                        "detail": (sh.get("typeName") or "") if nm else "",
+                        "station": where.get("station") or "-", "system": sh.get("system") or where.get("system") or "-",
+                        "arriveAt": int(arrive), "total": int(max(0.0, arrive - float(sh.get("start") or arrive)))})
+        out.sort(key=lambda r: r["arriveAt"])
+        return out
+
+    def ring_rows(self, here=None, max_ly=200.0, limit=14):
+        """Known rings nearest first. Mapped hotspots ride along."""
+        with self.lock:
+            rings = [dict(v) for v in self.rings.values()]
+            hot = {k: dict(v) for k, v in self.ring_hot.items()}
+            here = here if here is not None else self.here
+        out = []
+        for r in rings:
+            ly = self._ly(r["system"], here)
+            if ly < 0 or ly > max_ly:
+                continue
+            r["ly"] = ly
+            r["hot"] = hot.get(r["ring"], {})
+            out.append(r)
+        rank = {"PRISTINE": 0, "MAJOR": 1, "COMMON": 2, "LOW": 3, "DEPLETED": 4}
+        out.sort(key=lambda r: (r["ly"], rank.get(r["reserve"], 5), r["ring"]))
+        return out[:limit]
 
     def fleet_rows(self, here=None):
         """Stored ships, nearest first. The ship being flown is not listed (Elite stores it nowhere)."""
@@ -2682,12 +3247,15 @@ def _nav_log_body(body: str) -> str:
     if " // " in text:
         return text
     low = text.lower()
-    m = re.match(r"^(?:covas path failed|covas [a-z -]*failed|portable route (?:failed|aborted)[^:]*|navigation action failed)[^:]*:\s*(.*)$", text, re.IGNORECASE)
-    if m:
-        return "PLOT FAILED // " + (m.group(1) or text).strip()
+    # Aborts keep the step they stopped at (2026-10-27): "PLOT ABORTED // AT PASTE DESTINATION: ...".
+    # This used to sit below the generic match, which swallowed it and dropped the step name.
     m = re.match(r"^portable route aborted at ([^:]+):\s*(.*)$", text, re.IGNORECASE)
     if m:
-        return "PLOT ABORTED // " + m.group(2).strip()
+        return "PLOT ABORTED // AT " + m.group(1).strip().upper() + ": " + m.group(2).strip()
+    m = re.match(r"^(?:covas path failed|covas [a-z -]*failed|portable route failed|navigation action failed)([^:]*):\s*(.*)$", text, re.IGNORECASE)
+    if m:
+        where = m.group(1).strip()
+        return "PLOT FAILED // " + (where.upper() + ": " if where else "") + (m.group(2) or text).strip()
     if low.startswith("portable route complete"):
         rest = text.split(":", 1)[1].strip() if ":" in text else ""
         return "ROUTE PLOTTED" + (" // " + rest if rest else "")
@@ -3042,6 +3610,392 @@ def _qml_sd_device_arg(name):
 
 
 legacy._sd_device_arg = _qml_sd_device_arg
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-25 SESSION DEBRIEF: what you did in one game session (one journal set, from LoadGame),
+# with plain-rule tips. Offline only: everything comes from the journal.
+_DEBRIEF_HIGH_VALUE = {"platinum", "painite", "osmium", "palladium", "gold", "lowtemperaturediamonds",
+                       "voidopals", "voidopal", "monazite", "musgravite", "grandidierite", "alexandrite",
+                       "benitoite", "serendibite", "rhodplumsite", "bromellite", "taaffeite", "jadeite", "silver"}
+
+
+def _debrief_key(name):
+    return re.sub(r"[^a-z0-9]+", "", str(name or "").lower())
+
+
+def _debrief_words(v):
+    """Credits the way the ship voice should say them."""
+    v = int(v or 0)
+    a = abs(v)
+    if a >= 1_000_000:
+        m = a / 1_000_000
+        txt = (f"{m:.1f}".rstrip("0").rstrip(".")) + " million"
+    elif a >= 10_000:
+        txt = f"{int(round(a / 1000.0))} thousand"
+    else:
+        txt = f"{a:,}"
+    return ("minus " if v < 0 else "") + txt
+
+
+def _debrief_short(v):
+    v = int(v or 0)
+    a = abs(v)
+    if a >= 1_000_000_000:
+        return f"{v / 1_000_000_000:.2f} B"
+    if a >= 1_000_000:
+        return f"{v / 1_000_000:.2f} M"
+    if a >= 10_000:
+        return f"{int(round(v / 1000.0))} K"
+    return f"{v:,}"
+
+
+def _debrief_duration(secs):
+    secs = int(max(0, secs))
+    h, m = secs // 3600, (secs % 3600) // 60
+    if h:
+        return f"{h} hour{'s' if h != 1 else ''} {m} minute{'s' if m != 1 else ''}"
+    return f"{m} minute{'s' if m != 1 else ''}"
+
+
+def score_exploring_hint(scans, tons, kills):
+    """True when scanning was the main thing (so a few unsold scans are worth a mention)."""
+    return scans * 0.5 > max(tons, kills * 3.0)
+
+
+def _debrief_session(events):
+    """Turn one session's journal events into numbers, tips and a short spoken summary."""
+    ep = _ColonySiteScanner._epoch
+    ts = [ep(e.get("timestamp")) for e in events if e.get("timestamp")]
+    ts = [t for t in ts if t > 0]
+    if not ts:
+        return None
+    start, end = min(ts), max(ts)
+    ship = ""
+    credits_start = None
+    earned = {"mining": 0, "trade": 0, "bounties": 0, "missions": 0, "exploration": 0, "other": 0}
+    spent = 0
+    jumps, ly, systems = 0, 0.0, set()
+    refined = {}
+    sold = {}                       # commodity -> (tons, credits, profit)
+    prospected = []
+    drones = {"prospector": 0, "collection": 0}
+    hotspot_drops = []
+    bounties = kills = interdicted = died = 0
+    missions_done = missions_failed = 0
+    scans = first_disc = 0
+    # v2: what's unfinished at the end of the session, and how busy each activity was
+    hold = {}                        # mined commodity -> tons refined and not sold or dumped since
+    sell_price = {}                  # commodity -> last price per ton it sold for this session
+    bounties_unclaimed = 0           # bounty rewards since the last time bounties were cashed in
+    scans_unsold = 0                 # bodies scanned since the last exploration data sale
+    trades = 0                       # buys and sells that aren't mined goods
+    cashed_in = 0                    # bounty vouchers redeemed (earned in an earlier session, or this one)
+    for e in events:
+        ev = e.get("event")
+        if ev == "MiningRefined":
+            nm = str(e.get("Type_Localised") or e.get("Type") or "?")
+            hold[nm] = hold.get(nm, 0) + 1
+        elif ev in ("MarketSell", "EjectCargo"):
+            nm = str(e.get("Type_Localised") or e.get("Type") or "?")
+            nm = nm.title() if nm.islower() else nm
+            for k in list(hold):
+                if _debrief_key(k) == _debrief_key(nm):
+                    try:
+                        hold[k] = max(0, hold[k] - int(e.get("Count") or 0))
+                    except Exception:
+                        pass
+                    if ev == "MarketSell":
+                        try:
+                            sell_price[_debrief_key(k)] = int(e.get("SellPrice") or 0)
+                        except Exception:
+                            pass
+        elif ev == "Bounty":
+            try:
+                bounties_unclaimed += int(e.get("TotalReward") or e.get("Reward") or 0)
+            except Exception:
+                pass
+        elif ev == "RedeemVoucher" and str(e.get("Type") or "").lower() == "bounty":
+            bounties_unclaimed = 0
+            try:
+                cashed_in += int(e.get("Amount") or 0)
+            except Exception:
+                pass
+        elif ev == "Scan" and str(e.get("ScanType") or "") in ("Detailed", "AutoScan", "Basic"):
+            scans_unsold += 1
+        elif ev in ("MultiSellExplorationData", "SellExplorationData"):
+            scans_unsold = 0
+        elif ev == "MarketBuy":
+            trades += 1
+        if ev == "LoadGame":
+            if credits_start is None:
+                try:
+                    credits_start = int(e.get("Credits"))
+                except Exception:
+                    pass
+            ship = str(e.get("ShipName") or e.get("Ship_Localised") or e.get("Ship") or ship)
+        elif ev == "Loadout":
+            ship = str(e.get("ShipName") or "").strip() or ship
+        elif ev == "FSDJump":
+            jumps += 1
+            try:
+                ly += float(e.get("JumpDist") or 0)
+            except Exception:
+                pass
+            systems.add(str(e.get("StarSystem") or ""))
+        elif ev == "MiningRefined":
+            name = str(e.get("Type_Localised") or e.get("Type") or "?")
+            refined[name] = refined.get(name, 0) + 1
+        elif ev == "ProspectedAsteroid":
+            prospected.append([(str(m.get("Name_Localised") or m.get("Name") or ""), float(m.get("Proportion") or 0))
+                               for m in e.get("Materials") or []] + ([("MOTHERLODE:" + str(e.get("MotherlodeMaterial_Localised") or e.get("MotherlodeMaterial")), 100.0)]
+                                                                      if e.get("MotherlodeMaterial") else []))
+        elif ev == "LaunchDrone":
+            k = str(e.get("Type") or "").lower()
+            if k in drones:
+                drones[k] += 1
+        elif ev == "SupercruiseDestinationDrop":
+            t = str(e.get("Type_Localised") or e.get("Type") or "")
+            if "hotspot" in t.lower():
+                hotspot_drops.append(t.replace(" Hotspot", "").replace(" hotspot", ""))
+        elif ev == "MarketSell":
+            name = str(e.get("Type_Localised") or e.get("Type") or "?")
+            if name.islower():
+                name = name.title()
+            try:
+                count, total = int(e.get("Count") or 0), int(e.get("TotalSale") or 0)
+                profit = total - int(e.get("AvgPricePaid") or 0) * count
+            except Exception:
+                count = total = profit = 0
+            t0, c0, p0 = sold.get(name, (0, 0, 0))
+            sold[name] = (t0 + count, c0 + total, p0 + profit)
+        elif ev == "MarketBuy":
+            try:
+                spent += int(e.get("TotalCost") or 0)
+            except Exception:
+                pass
+        elif ev in ("BuyDrones", "BuyAmmo", "RefuelAll", "RefuelPartial", "Repair", "RepairAll", "RestockVehicle"):
+            try:
+                spent += int(e.get("TotalCost") or e.get("Cost") or 0)
+            except Exception:
+                pass
+        elif ev in ("ModuleBuy",):
+            try:
+                spent += int(e.get("BuyPrice") or 0) - int(e.get("SellPrice") or 0)
+            except Exception:
+                pass
+        elif ev in ("FetchRemoteModule",):
+            spent += int(e.get("TransferCost") or 0)
+        elif ev in ("ShipyardTransfer",):
+            spent += int(e.get("TransferPrice") or 0)
+        elif ev == "Bounty":
+            kills += 1
+            try:
+                bounties += int(e.get("TotalReward") or e.get("Reward") or 0)
+            except Exception:
+                pass
+        elif ev == "RedeemVoucher" and str(e.get("Type") or "").lower() != "bounty":
+            try:
+                earned["bounties"] += int(e.get("Amount") or 0)      # combat bonds and others
+            except Exception:
+                pass
+        elif ev == "MissionCompleted":
+            missions_done += 1
+            try:
+                earned["missions"] += int(e.get("Reward") or 0)
+            except Exception:
+                pass
+        elif ev in ("MissionFailed", "MissionAbandoned"):
+            missions_failed += 1
+        elif ev in ("MultiSellExplorationData", "SellExplorationData"):
+            try:
+                earned["exploration"] += int(e.get("TotalEarnings") or 0)
+            except Exception:
+                pass
+        elif ev == "SellOrganicData":
+            for b in e.get("BioData") or []:
+                try:
+                    earned["exploration"] += int(b.get("Value") or 0) + int(b.get("Bonus") or 0)
+                except Exception:
+                    pass
+        elif ev == "Scan":
+            scans += 1
+            if e.get("WasDiscovered") is False:
+                first_disc += 1
+        elif ev == "Interdicted":
+            interdicted += 1
+        elif ev == "Died":
+            died += 1
+        elif ev == "Resurrect":
+            try:
+                spent += int(e.get("Cost") or 0)
+            except Exception:
+                pass
+    earned["bounties"] += bounties
+    mined_keys = {_debrief_key(k) for k in refined}
+    mining_sold = {k: v for k, v in sold.items() if _debrief_key(k) in mined_keys}
+    for name, (tons, cr, profit) in sold.items():
+        if _debrief_key(name) in mined_keys:
+            earned["mining"] += cr
+        else:
+            earned["trade"] += max(0, profit)
+            trades += 1
+    total_earned = sum(earned.values())
+    tons = sum(refined.values())
+    dur = end - start
+    lines = [{"label": "TIME PLAYED", "value": _debrief_duration(dur).upper()}]
+    if credits_start is not None:
+        lines.append({"label": "CREDITS AT START", "value": _debrief_short(credits_start) + " CR"})
+    lines.append({"label": "EARNED", "value": _debrief_short(total_earned) + " CR"})
+    if spent:
+        lines.append({"label": "SPENT", "value": _debrief_short(spent) + " CR"})
+    if dur > 600 and total_earned > 0:
+        lines.append({"label": "PER HOUR", "value": _debrief_short(total_earned * 3600 / dur) + " CR"})
+    if jumps:
+        lines.append({"label": "JUMPS", "value": f"{jumps} // {ly:,.0f} LY // {len(systems)} SYSTEMS"})
+    if tons:
+        top = sorted(refined.items(), key=lambda kv: -kv[1])[:3]
+        lines.append({"label": "MINED", "value": f"{tons} T // " + ", ".join(f"{n} {k.upper()}" for k, n in top)})
+    if earned["mining"]:
+        lines.append({"label": "MINING SALES", "value": _debrief_short(earned["mining"]) + " CR"})
+    if earned["trade"]:
+        lines.append({"label": "TRADE PROFIT", "value": _debrief_short(earned["trade"]) + " CR"})
+    if kills or earned["bounties"]:
+        lines.append({"label": "COMBAT", "value": f"{kills} KILLS // {_debrief_short(earned['bounties'])} CR"})
+    if cashed_in:
+        lines.append({"label": "CASHED IN", "value": f"{_debrief_short(cashed_in)} CR IN BOUNTY VOUCHERS"})
+    if missions_done or missions_failed:
+        lines.append({"label": "MISSIONS", "value": f"{missions_done} DONE" + (f" // {missions_failed} FAILED" if missions_failed else "")})
+    if earned["exploration"] or first_disc:
+        lines.append({"label": "EXPLORATION", "value": f"{_debrief_short(earned['exploration'])} CR" + (f" // {first_disc} FIRST DISCOVERIES" if first_disc else "")})
+    if interdicted:
+        lines.append({"label": "INTERDICTED", "value": f"{interdicted} TIME{'S' if interdicted != 1 else ''}"})
+    if died:
+        lines.append({"label": "SHIP LOST", "value": f"{died} TIME{'S' if died != 1 else ''}"})
+
+    tips = []
+    later = []
+    # mining tips
+    if prospected:
+        good = sum(1 for rock in prospected if any(_debrief_key(n) in _DEBRIEF_HIGH_VALUE and p >= 10 for n, p in rock if not n.startswith("MOTHERLODE")))
+        cores = sum(1 for rock in prospected if any(n.startswith("MOTHERLODE") for n, _ in rock))
+        if len(prospected) >= 5 and good == 0 and cores == 0:
+            tips.append(f"You prospected {len(prospected)} rocks and none had a valuable material above 10 percent. Skip those rocks faster.")
+        elif good:
+            later.append(f"{good} of {len(prospected)} rocks you prospected {'was' if good == 1 else 'were'} worth mining.")
+    for hs in dict.fromkeys(hotspot_drops):
+        if _debrief_key(hs) not in mined_keys and tons:
+            tips.insert(0, f"You mined in a {hs} hotspot but refined no {hs}. In a hotspot, prospect until a rock shows it above 20 percent.")
+    if mining_sold:
+        name, (t_, cr, _p) = max(mining_sold.items(), key=lambda kv: kv[1][1])
+        if earned["mining"] and cr / earned["mining"] >= 0.5 and len(mining_sold) > 1:
+            tips.append(f"{name} paid most of your haul: {_debrief_short(cr)} of {_debrief_short(earned['mining'])} credits.")
+        cheap = [k for k, (tt, cc, _) in mining_sold.items() if tt and cc / tt < 8000]
+        cheap_t = sum(mining_sold[k][0] for k in cheap)
+        sold_t = sum(v[0] for v in mining_sold.values())
+        if cheap and sold_t and cheap_t / sold_t >= 0.3:
+            tips.append(f"{cheap_t} of {sold_t} tons sold for under 8 thousand a ton ({', '.join(c for c in cheap[:3])}). Leave those for when the hold has room to spare.")
+    if died:
+        tips.append("You lost your ship. Check the rebuy cost on the Flight Deck before the next run.")
+    if interdicted >= 2:
+        tips.append(f"You were interdicted {interdicted} times. Keep shields up and the Emergency Escape key handy.")
+    tips.extend(later)
+    if not tips and total_earned > 0 and dur > 600:
+        tips.append(f"About {_debrief_words(total_earned * 3600 / dur)} credits an hour.")
+
+    # ---- unfinished business (all from the journal)
+    left = {k: v for k, v in hold.items() if v > 0}
+    left_tons = sum(left.values())
+    # a value only when every commodity left in the hold sold this session (its price is known)
+    left_value = sum(v * sell_price.get(_debrief_key(k), 0) for k, v in left.items()) \
+        if all(sell_price.get(_debrief_key(k)) for k in left) else 0
+    unfinished = []
+    if left_tons:
+        top = sorted(left.items(), key=lambda kv: -kv[1])
+        names = " and ".join(k for k, _ in top[:2])
+        unfinished.append(f"{left_tons} tons of {names}" + (f" worth about {_debrief_words(left_value)}" if left_value >= 10000 else "") + " still in the hold")
+    if bounties_unclaimed >= 1000:
+        unfinished.append(f"{_debrief_words(bounties_unclaimed)} in bounties not cashed in")
+    unsold_scans = scans_unsold
+    if unsold_scans >= 25 or (unsold_scans >= 5 and score_exploring_hint(scans, tons, kills)):
+        unfinished.append(f"{unsold_scans} scans not sold")
+    unfinished_lines = [{"label": "NOT DONE YET", "value": u.upper()} for u in unfinished]
+    lines.extend(unfinished_lines)
+
+    # ---- what the session was mostly about
+    score = {"mining": tons + len(prospected) * 0.5, "bounty hunting": kills * 3.0, "exploring": scans * 0.5,
+             "trading": trades * 2.0, "running missions": missions_done * 3.0}
+    ranked = sorted(score.items(), key=lambda kv: -kv[1])
+    activity = ranked[0][0] if ranked[0][1] >= 3 else ""
+    second = ranked[1][0] if activity and ranked[1][1] >= 3 and ranked[1][1] >= ranked[0][1] * 0.35 else ""
+
+    # spoken: two to four short sentences, facts only
+    if activity:
+        spoken = f"Last time you were {activity}" + (f", with some {second}" if second else "") + f", for {_debrief_duration(dur)}."
+    else:
+        spoken = f"Last session, {_debrief_duration(dur)}."
+    if activity == "mining" and tons:
+        top = sorted(refined.items(), key=lambda kv: -kv[1])[:2]
+        spoken += f" You refined {tons} tons, mostly {' and '.join(k for k, _ in top)}"
+        spoken += (f", and sold {_debrief_words(earned['mining'])} worth." if earned["mining"] else ".")
+    elif activity == "bounty hunting":
+        spoken += f" {kills} kill{'s' if kills != 1 else ''}, {_debrief_words(bounties)} in bounties."
+    elif activity == "exploring":
+        spoken += f" {scans} scans" + (f", {first_disc} of them first discoveries" if first_disc else "") + "."
+    elif activity == "trading" and earned["trade"]:
+        spoken += f" About {_debrief_words(earned['trade'])} in trade profit."
+    elif activity == "running missions":
+        spoken += f" {missions_done} missions done" + (f" for {_debrief_words(earned['missions'])}" if earned["missions"] else "") + "."
+    elif total_earned:
+        spoken += f" You earned about {_debrief_words(total_earned)} credits."
+    elif jumps:
+        spoken += f" {jumps} jumps, {int(ly)} light years."
+    if unfinished:
+        u = unfinished[:2]
+        spoken += " You've got " + (u[0] if len(u) == 1 else f"{u[0]}, and {u[1]}") + "."
+    if cashed_in and activity != "bounty hunting":
+        spoken += f" You also cashed in {_debrief_words(cashed_in)} in old bounty vouchers."
+    elif tips and not unfinished:
+        spoken += " " + tips[0]
+    return {
+        "activity": activity, "unfinished": unfinished, "mining": activity == "mining",
+        "start": int(start), "end": int(end), "ship": ship, "lines": lines, "tips": tips[:4], "spoken": spoken,
+        "earned": int(total_earned), "jumps": jumps, "minutes": int(dur // 60),
+        "busy": bool(total_earned or jumps or tons or kills or missions_done),
+    }
+
+
+def _debrief_sessions(journal_dir):
+    """Group journal files into game sessions (one per game launch, .01/.02 parts together)."""
+    groups = {}
+    for f in sorted(Path(journal_dir).glob("Journal.*.log")):
+        key = f.name.rsplit(".", 2)[0]
+        groups.setdefault(key, []).append(f)
+    out = []
+    for key in sorted(groups):
+        files = groups[key]
+        try:
+            if sum(p.stat().st_size for p in files) < 2000:
+                continue                      # launcher blips with no game in them
+        except Exception:
+            continue
+        out.append(files)
+    return out
+
+
+def _debrief_read(files):
+    events = []
+    for f in files:
+        try:
+            with open(f, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    try:
+                        events.append(json.loads(line))
+                    except Exception:
+                        continue
+        except Exception:
+            continue
+    return events
 
 
 class _SdRetryProxy:
@@ -3569,6 +4523,17 @@ def build_live_snapshot(app: legacy.BridgeApp) -> dict[str, Any]:
         ai_comms_rows = ai_comms_rows[-6:]
     except Exception:
         ai_comms_rows = []
+    # 2026-10-28 in-game overlay: what the ship says goes in the chat panel too (SHIP rows,
+    # spoken in the last 45 s), after the AI conversation. The Bridge window's AI COMMS is unchanged.
+    overlay_rows = list(ai_comms_rows)
+    try:
+        now_m = time.monotonic()
+        for ts, line in list(getattr(app, "_qml_ship_lines", []) or []):
+            if now_m - ts <= 45:
+                overlay_rows.append({"speaker": "SHIP", "text": line[:300]})
+        overlay_rows = overlay_rows[-6:]
+    except Exception:
+        pass
 
     pending_action = getattr(app, "copilot_pending_action", None)
     if isinstance(pending_action, dict):
@@ -4568,6 +5533,7 @@ def build_live_snapshot(app: legacy.BridgeApp) -> dict[str, Any]:
         "aiCopilotResponse": ai_copilot_response,
         "aiToolActivity": ai_tool_activity,
         "aiCommsRows": ai_comms_rows,
+        "overlayRows": overlay_rows,
         "aiToolMode": ai_tool_mode,
         "aiPendingAction": ai_pending_text,
         "aiPendingActionAvailable": bool(isinstance(pending_action, dict)),
@@ -5225,6 +6191,7 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     _UI_PAGE_NAMES = {
         0: "FLIGHT DECK", 1: "NAVIGATION", 2: "COMBAT", 3: "TRADE", 4: "COLONIZATION",
         5: "COMMANDER", 6: "AI & VOICE", 7: "AUDIO", 8: "SETUP", 9: "DISPLAY", 10: "CONTROLS", 11: "AUTOMATION",
+        13: "MINING",
     }
 
     def request_copilot_command(self):
@@ -5450,6 +6417,22 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     # Contextual page help + AI UI director. QML remains the visible UI, while
     # this adapter owns narration sequencing and one-shot navigation hints.
     _PAGE_HELP = {
+        # 13: MINING (2026-10-27). The 30-second version for someone who has never mined.
+        # 14: ENGINEERING (2026-10-28; the CAMERA page 15 was removed the same day)
+        14: [
+            ("YOUR ENGINEERED MODULES", "Every engineered module on the ship you're flying: the blueprint, its grade, how far through the grade it is, and any experimental effect. Stored shows the engineered modules you keep in storage, as of your last visit to outfitting."),
+            ("ENGINEERS", "Every engineer the game has told you about. Unlocked ones are at the top with their rank out of five. Invited means you've met the requirement to visit them, known means you've heard of them."),
+            ("MATERIALS", "Your manufactured and encoded materials, most first. Raw materials are on the Mining page, under Rhino and Raw."),
+        ],
+        13: [
+            ("LAST ROCK", "Fire a prospector limpet at a rock and the Bridge gives it a verdict. That big word is the verdict. MINE means it's worth your time. MAYBE means there's some value, but you can do better. SKIP means move on to the next rock. CORE means there's a motherlode inside, crack it open with a seismic charge. To see the same contents in the game, target the prospector limpet stuck to the rock. Mining lasers work anywhere on it."),
+            ("ROCKS CHECKED", "Every rock you check this run, one tile per material, best first. The tile colour is the same verdict: green is mine, amber is maybe, gold is a core, and dim is skip. Tap a tile to see its best rock. Looking for something in particular? Add it under Looking For, and the ship tells you the moment a prospector finds it."),
+            ("HAUL AND HOLD", "Haul is what you've refined this run, what it's worth, and your rate per hour. Hold and Kit shows cargo space and limpets left. Each piece of mining kit gets a filled dot when the ship has it, and an empty amber dot when it's missing."),
+            ("WHERE TO SELL", "The best place within 60 light years to sell what's in your hold. Each line shows the price per ton, the station, the distance, and the pad size. Cheap fragments fill the refinery too. Empty those bins from the right panel, Inventory, Refinery."),
+            ("RINGS NEAR YOU", "Rings from your own scans. Pristine rings have the most to mine. A green ring name means you've mapped it with the surface scanner, which shows its hotspots. Rings with hotspots for your Looking For list go to the top, and Plot takes you there."),
+            ("RHINO", "This is the Rhino and Raw view. When you drive the Rhino it shows the Rhino's hold, the tons you've mined on the surface, and every rig you've collected. Map a body with the surface scanner first, and the number of mining locations shows here too. The game doesn't report the rigs themselves, so recover them before you board."),
+            ("MINING KEYS", "Fire groups, Clear and Jump to leave the ring, the Collector key, and New Run. Rhino and Raw shows your Rhino surface mining and your engineering raw materials, and the ship says when one is full."),
+        ],
         # Built-in help is a Bridge feature, not an AI feature. Keep the narration
         # product-neutral so it works with AI disabled and with any selected voice.
         # The ? button is intentionally beginner-friendly; PTT can answer deeper
@@ -5573,7 +6556,7 @@ class HeadlessBridgeApp(legacy.BridgeApp):
 
     def _page_help_start(self, page, start_step=0, end_step=None):
         try:
-            page = max(0, min(12, int(page)))
+            page = max(0, min(14, int(page)))
         except Exception:
             page = 0
         rows = self._PAGE_HELP.get(page) or []
@@ -5592,6 +6575,7 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         self._page_help_serial = int(getattr(self, "_page_help_serial", 0) or 0) + 1
         serial = self._page_help_serial
         self._page_help_active = True
+        self._page_help_example_said = False
         self._page_help_page = page
         self._page_help_step = start_step
         self._page_help_end_step = end_step
@@ -5679,6 +6663,15 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             self.after(100, lambda: self._page_help_speak_step(serial, step, attempt + 1))
             return
         label, text = rows[step]
+        # Mining tour: say the EXAMPLE line once, on the first step whose panel is empty
+        # (that panel shows a sample under an amber EXAMPLE stamp).
+        if page == 13 and not getattr(self, "_page_help_example_said", False):
+            try:
+                if (getattr(self, "_qml_mining_empty", None) or {}).get(step):
+                    text = text + " Nothing here yet, so the amber EXAMPLE shows what it will look like."
+                    self._page_help_example_said = True
+            except Exception:
+                pass
         self._page_help_step = step
         self._page_help_label = label
         self.voice_last_announcement = text
@@ -6365,9 +7358,11 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     def _copilot_find_best_target_tool(self, _args=None):
         if self._wizard_runtime_paused():
             return {"ok": False, "error": "Guided setup currently owns Bridge controls."}
+        if self.native_command_busy and str(self.native_command_name) == "Find Best Target":
+            return {"ok": True, "status": "A sweep is already running; the ship voice will announce the result.", "running": True}
         if self.egress_phase != "IDLE" or self.station_automation_busy or self.native_command_busy:
             owner = "Emergency Egress" if self.egress_phase != "IDLE" else ("station maintenance" if self.station_automation_busy else self.native_command_name)
-            return {"ok": False, "error": f"Cockpit controls are busy with {owner}."}
+            return {"ok": False, "error": f"Cockpit controls are busy with {owner}. Say cancel first, or ask again when it finishes."}
         if not self.bindings.keyboard_binding("CycleNextTarget"):
             return {"ok": False, "error": self._no_key_message("CycleNextTarget", "Cycle Next Target")}
         accepted = threading.Event()
@@ -6382,18 +7377,11 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         self.after(0, begin)
         if not accepted.wait(3.0) or not box.get("accepted"):
             return {"ok": False, "error": box.get("status", "Best-target sweep was not started.")}
-        generation = box.get("generation")
-        deadline = time.monotonic() + 18.0
-        while time.monotonic() < deadline:
-            if int(getattr(self, "native_command_generation", 0) or 0) != generation or not bool(getattr(self, "native_command_busy", False)):
-                break
-            time.sleep(0.08)
-        status = str(getattr(self, "native_command_status", "") or "")
-        if bool(getattr(self, "native_command_busy", False)) and int(getattr(self, "native_command_generation", 0) or 0) == generation:
-            return {"ok": False, "error": "Best-target sweep is still running; use Cancel if needed."}
-        if "FAILED" in status or "BUSY" in status:
-            return {"ok": False, "error": status}
-        return {"ok": True, "status": status, "ship": str(getattr(self.state_data, "target_ship", "-") or "-")}
+        # Don't hold the co-pilot for the whole sweep: the ship voice announces
+        # the start, the pick and whether it is wanted. The AI stays free to
+        # hear "cancel" or the next request while the sweep runs.
+        return {"ok": True, "status": "Sweep started. The ship voice is announcing progress and will say the best target and whether it is wanted or clean. Do not repeat or predict the result; reply in a few words at most, or not at all.",
+                "running": True}
 
     def _execute_copilot_tool(self, name, args, action_mode):
         # Publish a one-shot UI destination before long-running tools start. QML
@@ -6530,14 +7518,216 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                     merit_delta = int(match.group(1).replace(",", ""))
                 except Exception:
                     merit_delta = 0
-                if merit_delta > 500:
-                    spoken_text = f"{merit_delta:,} merits earned."
-                else:
-                    spoken_text = "Merits earned."
-                    key = "powerplay:small-merits"
-                    cooldown = max(float(cooldown or 0.0), 8.0)
+                # Most commanders don't follow Powerplay: only with POWERPLAY CALLOUTS on,
+                # only big awards, only on TALKATIVE.
+                if merit_delta < 1000 or not bool(getattr(self, "_qml_powerplay_callouts", False)):
+                    return False
+                spoken_text = f"{merit_delta:,} merits earned."
+                required_level = "HIGH"
 
         return self._qml_voice_say(required_level, spoken_text, kind=kind, key=key, cooldown=cooldown, _startup_release=_startup_release)
+
+    def queue_ai_trigger(self, label, priority=50, key="general", delay=0, cooldown=30):
+        # "Profitable sale produced no merit event": only for commanders who switched
+        # POWERPLAY CALLOUTS on (Setup > Automation).
+        if str(key) == "powerplay_no_merit" and not bool(getattr(self, "_qml_powerplay_callouts", False)):
+            return
+        return super().queue_ai_trigger(label, priority, key, delay, cooldown)
+
+    # ---- Emergency escape talks (2026-10-25) ------------------------------------
+    # The .95 egress only updated a status line. Each spoken line follows a phase change
+    # the egress itself confirmed from Status.json (mass lock, FSD charging, supercruise).
+    def _qml_egress_voice_tick(self):
+        phase = str(getattr(self, "egress_phase", "IDLE") or "IDLE")
+        hist = list(self.egress_history)
+        st = self.__dict__.get("_qml_egress_voice")
+        if st is None:
+            st = self._qml_egress_voice = {"phase": "IDLE", "last": hist[-1] if hist else None, "masslock_said": False}
+        # history can be a capped deque: take the lines after the last one already seen
+        if st["last"] in hist:
+            new_lines = hist[len(hist) - 1 - hist[::-1].index(st["last"]) + 1:]
+        else:
+            new_lines = hist[-3:]
+        st["last"] = hist[-1] if hist else None
+        prev = st["phase"]
+        st["phase"] = phase
+        def say(text, key):
+            self._voice_say("LOW", text, kind="CRITICAL", key=f"egress:{key}:{time.monotonic():.1f}", cooldown=0)
+        joined = " ".join(new_lines).upper()
+        if prev == "IDLE" and phase == "CLEAR_MASS_LOCK":
+            st["masslock_said"] = False
+            st["started"] = time.monotonic()
+            say(_vary("egress-start", ["Emergency escape. Hang on.", "Emergency escape. Getting us out.",
+                                       "Emergency escape. Engines to max."])
+                + (" Chaff out." if bool(getattr(self, "egress_chaff_sent", False)) else ""), "start")
+            return
+        if prev == "IDLE" and phase == "IDLE" and "REFUSED" in joined:
+            st["refused"] = True
+            reason = str(getattr(self, "egress_status", "") or "")
+            if "foreground" in reason.lower():
+                say("Can't escape. Bring Elite to the front with no panel open.", "refused")
+            elif "normal-space" in reason.lower():
+                say("Escape only works in normal space.", "refused")
+            elif "binding" in reason.lower():
+                say("Can't escape. A key bind is missing. Check Setup, Controls.", "refused")
+            else:
+                say("Can't start the escape.", "refused")
+            return
+        if phase == "CLEAR_MASS_LOCK" and not st.get("masslock_said") and time.monotonic() - st.get("started", 0) > 4.0:
+            if self.state_data.flag("FSD Mass Locked"):
+                st["masslock_said"] = True
+                say(_vary("egress-masslock", ["Mass locked. Keep flying away from them.", "Still mass locked. Keep going.",
+                                              "Mass locked. Put distance between us."]), "masslock")
+            return
+        if prev == "CLEAR_MASS_LOCK" and phase in ("WAIT_FSD", "WAIT_SUPERCRUISE"):
+            say(_vary("egress-charge", ["Mass lock clear. Charging.", "We're clear of the mass lock. FSD charging.",
+                                        "Clear. Charging the drive."]), "charge")
+            return
+        if prev != "IDLE" and phase == "IDLE":
+            if "COMPLETE" in joined:
+                say(_vary("egress-done", ["We're out. Supercruise.", "Made it. We're in supercruise.", "Clear. Supercruise."]), "done")
+            elif "CANCELLED" in joined:
+                say("Escape cancelled. You have the controls.", "cancel")
+            else:
+                say("Escape stopped. You have the controls.", "stop")
+
+    # ---- Pirates and attacks (2026-10-25) ----------------------------------------
+    # Pirate comms carry Frontier's own message ids with the numbers in them
+    # ("$Pirate_ThreatenSpecific01:#units=3:#CommodityName=$monazite_Name;"), so the demand
+    # and the timer are read out as facts. "Under attack" once per fight.
+    _PIRATE_ARG = re.compile(r"#(\w+)=([^:;]*)")
+
+    def consider_voice_event(self, e):
+        try:
+            self._qml_threat_voice(e)
+        except Exception:
+            pass
+        try:
+            self._qml_travel_voice(e)
+        except Exception:
+            pass
+        return super().consider_voice_event(e)
+
+    # ---- travel announcer + scans (2026-10-28), TALKATIVE only, facts from the journal ----------
+    _SCOOP_CLASSES = set("OBAFGKM")
+
+    def _qml_travel_voice(self, e):
+        ev = str(e.get("event") or "")
+        if ev == "StartJump" and str(e.get("JumpType") or "") == "Hyperspace":
+            self._qml_jump_star = (str(e.get("StarSystem") or ""), str(e.get("StarClass") or ""))
+            return
+        if ev == "FSDJump":
+            system = str(e.get("StarSystem") or "").strip()
+            if not system:
+                return
+            sys_star = getattr(self, "_qml_jump_star", ("", ""))
+            star = sys_star[1] if sys_star[0].casefold() == system.casefold() else ""
+            # FSDTarget for the next leg lands just after the jump; give it a moment
+            self.after(1500, lambda: self._qml_say_arrival(system, star, e.get("timestamp")))
+            return
+        if ev == "Scanned":
+            what = str(e.get("ScanType") or "").lower()
+            noun = {"cargo": "Cargo scan", "crime": "Crime scan", "cabin": "Cabin scan", "data": "Data scan"}.get(what, "Scan")
+            self._voice_say("HIGH", _vary_fmt("scanned", ["{n} on us.", "We're being scanned. {n}.", "{n}. Someone's having a look.",
+                                                          "{n} incoming."], n=noun), kind="SCAN", key="scanned", cooldown=30)
+
+    def _qml_say_arrival(self, system, star, ts):
+        s = self.state_data
+        parts = [_vary_fmt("arrived", ["Arrived in {s}.", "{s}.", "Jump complete. {s}.", "Welcome to {s}.", "We're in {s}."], s=system)]
+        cls = star.split("_")[0].upper() if star else ""
+        if cls:
+            if cls in self._SCOOP_CLASSES:
+                parts.append(_vary("scoopable", ["Scoopable star.", "The star's scoopable.", "We can fuel here."]))
+            elif cls == "N":
+                parts.append("Neutron star.")
+            elif cls.startswith("D"):
+                parts.append("White dwarf.")
+            elif cls == "H":
+                parts.append("Black hole.")
+            else:
+                parts.append(_vary("no-scoop", ["Can't scoop this one.", "Not a scoopable star."]))
+        dest = str(getattr(s, "nav_route_destination", "") or "")
+        try:
+            left = int(getattr(s, "nav_target_remaining_jumps", 0) or 0)
+        except Exception:
+            left = 0
+        if dest and dest != "-" and dest.casefold() == system.casefold():
+            parts.append(_vary("route-end", ["That's your destination.", "End of the route.", "Destination reached."]))
+        elif left > 0:
+            parts.append("One jump to go." if left == 1 else _vary_fmt("jumps-left", ["{n} jumps to go.", "{n} more jumps.",
+                                                                                      "{n} jumps left."], n=left))
+        self._voice_say("HIGH", " ".join(parts), kind="TRAVEL", key=f"arrived:{system}:{ts}", cooldown=0)
+
+    def _qml_threat_voice(self, e):
+        ev = str(e.get("event") or "")
+        st = self.__dict__.setdefault("_qml_threat", {"ships": {}, "pirate": "", "pirate_mono": 0.0, "attack_mono": 0.0})
+        now = time.monotonic()
+        if ev == "ShipTargeted" and e.get("TargetLocked"):
+            pilot = str(e.get("PilotName_Localised") or "").strip()
+            ship = str(e.get("Ship_Localised") or "").strip() or legacy.pretty_name(e.get("Ship") or "")
+            if pilot and ship:
+                st["ships"][pilot.casefold()] = (ship, str(e.get("LegalStatus") or ""))
+            return
+        if ev == "UnderAttack" and str(e.get("Target") or "You") == "You":
+            if now - st["attack_mono"] < 60:
+                st["attack_mono"] = now
+                return
+            st["attack_mono"] = now
+            who = ""
+            if st["pirate"] and now - st["pirate_mono"] < 180:
+                ship = st["ships"].get(st["pirate"].casefold())
+                if ship:
+                    who = f" {ship[0]}" + (", wanted." if ship[1].lower() == "wanted" else ".")
+            self._voice_say("LOW", _vary("under-attack", ["Under attack.", "We're under attack.", "Taking fire."]) + who,
+                            kind="THREAT", key="under-attack", cooldown=20)
+            return
+        if ev != "ReceiveText":
+            return
+        msg = str(e.get("Message") or "")
+        if not msg.startswith("$Pirate_"):
+            return
+        sender = str(e.get("From_Localised") or "").strip()
+        if sender:
+            st["pirate"], st["pirate_mono"] = sender, now
+        token = msg[1:].split(":", 1)[0].rstrip(";")
+        args = {k.lower(): v for k, v in self._PIRATE_ARG.findall(msg)}
+        def commodity():
+            raw = args.get("commodityname", "")
+            loc = re.sub(r"^\$|_name$", "", raw, flags=re.IGNORECASE)
+            name = legacy.pretty_name(loc) if loc else "cargo"
+            return name.title() if name.islower() and loc else name
+        if token.startswith("Pirate_OnStartScanCargo"):
+            self._voice_say("MED", _vary("pirate-scan", ["Pirate scanning our cargo.", "We're being cargo scanned. Pirate.",
+                                                         "Pirate's scanning the hold."]), kind="THREAT", key="pirate-scan", cooldown=60)
+        elif token.startswith(("Pirate_ThreatenSpecific", "Pirate_ThreatenUnits", "Pirate_ThreatenValue")):
+            units = args.get("units", "")
+            if token.startswith("Pirate_ThreatenSpecific") and units:
+                demand = f"{units} tons of {commodity()}"
+            elif units:
+                demand = f"{units} tons of cargo"
+            elif args.get("value"):
+                demand = f"cargo worth {args.get('value')} credits"
+            else:
+                demand = "cargo"
+            st["demand"], st["demand_mono"] = demand, now
+            # the timer message follows a second later; say both together, or the demand alone
+            def later(stamp=now):
+                if st.get("demand_mono") == stamp and not st.get("demand_said") == stamp:
+                    st["demand_said"] = stamp
+                    self._voice_say("LOW", f"Pirate wants {demand}.", kind="THREAT", key=f"pirate-demand:{stamp}", cooldown=0)
+            threading.Timer(1.6, later).start()
+        elif token.startswith("Pirate_ThreatenTimer"):
+            secs = args.get("seconds", "")
+            stamp = st.get("demand_mono", 0.0)
+            if stamp and now - stamp < 5 and st.get("demand_said") != stamp:
+                st["demand_said"] = stamp
+                self._voice_say("LOW", f"Pirate wants {st.get('demand')}." + (f" {secs} seconds." if secs else ""),
+                                kind="THREAT", key=f"pirate-demand:{stamp}", cooldown=0)
+        elif token.startswith(("Pirate_OnDeclarePiracyAttack", "Pirate_UnprovokedAttack")):
+            self._voice_say("LOW", _vary("pirate-attack", ["Pirate's attacking.", "Here they come. Pirate attacking.",
+                                                           "Pirate opening fire."]), kind="THREAT", key="pirate-attack", cooldown=30)
+        elif token.startswith("Pirate_StartInterdiction"):
+            self._voice_say("LOW", "Pirate interdiction. Fight the pull or submit and run.", kind="THREAT", key="pirate-interdict", cooldown=30)
 
     def _qml_voice_say(self, required_level, text, kind="INFO", key=None, cooldown=5.0, _startup_release=False):
         """Same rules as the .95 _voice_say, with one timing change: when the
@@ -6550,6 +7740,11 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         text = " ".join(str(text or "").replace("\r", " ").replace("\n", " ").split()).strip()
         if not text:
             return False
+        if not _startup_release:
+            try:
+                text = _voice_variant(text, kind)
+            except Exception:
+                pass
         if self.startup_voice_gate_active and not _startup_release:
             self.startup_voice_hold.append((required_level, text, kind, key, cooldown))
             return True
@@ -6584,6 +7779,9 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         self.voice_last_announcement = text
         self.voice_last_kind = kind_up
         self.voice_history.append(f"{time.strftime('%H:%M:%S')}  {self.voice_last_kind} | {text}")
+        if kind_up not in ("AI", "PAGE HELP", "WIZARD", "STARTUP"):
+            lines = self.__dict__.setdefault("_qml_ship_lines", deque(maxlen=6))
+            lines.append((time.monotonic(), text))
         pace = 0.92 if "credits" in text.casefold() else 1.0
         hold_until = 0.0
         if self._voice_attention_for_kind(self.voice_last_kind):
@@ -6619,6 +7817,13 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             return
         if len(items) == 1:
             line = items[0]
+            m = re.match(r"^Collected (?:(\d+) )?(.+?)\.(?: (\d+) held\.)?$", line)
+            if m:
+                n, what, held = m.group(1), m.group(2), m.group(3)
+                q = f"{n} {what}" if n and n != "1" else what
+                line = _vary_fmt("pickup-one", ["Collected {q}.", "Picked up {q}.", "{q} aboard.", "Got {q}."], q=q)
+                if held:
+                    line += " " + _vary_fmt("pickup-held", ["{h} held.", "{h} in storage.", "That makes {h}."], h=held)
         else:
             names = []
             for t in items:
@@ -6632,7 +7837,8 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                 listed = ", ".join(names[:-1]) + (" and " if len(names) > 1 else "") + names[-1]
             else:
                 listed = f"{names[0]}, {names[1]}, and {len(names) - 2} more"
-            line = f"{noun} collected: {listed}."
+            line = _vary_fmt("pickup-many", ["{noun} collected: {listed}.", "Picked up {listed}.",
+                                             "{listed}, all aboard.", "Collected {listed}."], noun=noun, listed=listed)
         self._qml_voice_say(batch.get("level") or "HIGH", line, kind="PICKUP", key=f"pickup:{time.monotonic()}", cooldown=0)
 
     def _voice_engine_speech_started(self, text_value, backend, started_mono):
@@ -7002,6 +8208,9 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         "jettison_all": ("jettison all cargo", "jettison all the cargo", "jettison cargo", "jettison the cargo",
                          "dump all cargo", "dump all the cargo", "dump cargo", "dump the cargo",
                          "jettison everything", "dump everything"),
+        "collector": ("deploy collector", "deploy collectors", "launch collector", "launch collectors", "deploy a collector",
+                      "launch a collector", "deploy limpet", "deploy limpets", "launch limpet", "launch limpets",
+                      "deploy more collectors", "more collectors", "send out a collector", "collector"),
         "jettison_confirm": ("confirm jettison", "confirm", "confirmed", "yes jettison", "yes jettison it",
                              "jettison it", "dump it", "yes dump it", "do it", "yes do it", "yes"),
     }
@@ -7023,6 +8232,12 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         for intent, phrases in self._FAST_PHRASES.items():
             if clean in phrases:
                 return intent
+        m = re.match(r"^(?:(?:switch|change|go|swap|move|set) (?:to |it to )?|select |use )?(?:the )?(?:fire )?group ([a-z0-9]+)$", clean)
+        if m and m.group(1) in _FIRE_GROUP_WORDS:
+            return ("firegroup_select", _FIRE_GROUP_WORDS[m.group(1)])
+        m = re.match(r"^(?:find(?: me)?|where(?: is| s)?|take me to|plot(?: a route)? to|go to|nearest|closest|show me)?\s*(?:a |an |the )?(?:nearest |closest )?([a-z ]+?) hot ?spots?$", clean)
+        if m and m.group(1).strip() and m.group(1).strip() not in ("mining", "a", "the"):
+            return ("hotspot_find", m.group(1).strip())
         m = re.match(r"^(?:plot (?:a )?(?:route|course) to|set (?:a )?course (?:for|to)|take me to|route to|plot to|jump to) (.+)$", clean)
         if m:
             return ("plot", m.group(1).strip())
@@ -7089,6 +8304,23 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             if not _fighter_recall_preflight(self):
                 return "There's no fighter to recall."
             self.start_recall_fighter()
+        elif name == "hotspot_find":
+            return self._qml_find_hotspot(intent[1])
+        elif name == "collector":
+            blocked = self._qml_deploy_collector(spoken_reply=True)
+            if blocked:
+                return blocked
+            return _vary("collector-ok", ["Collector away.", "Launching a collector.", "Collector out."])
+        elif name == "firegroup_select":
+            index = int(intent[1])
+            letter = _FIRE_GROUP_LETTERS[index]
+            blocker = self._qml_fire_group_blocker()
+            if blocker:
+                return blocker
+            if self._qml_fire_group_now() == index:
+                return f"We're already on fire group {letter}."
+            self._qml_select_fire_group(index)
+            return f"Fire group {letter}."
         elif name == "firegroup":
             def cycle_fire_group():
                 binding = self._native_binding("CycleFireGroupNext")
@@ -7243,7 +8475,223 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             if str(command_id) == "push_to_talk" and bool(getattr(self, "_wizard_ptt_test_armed", False)):
                 return super()._dispatch_bridge_hotkey(command_id, source=source)
             return
+        cid = str(command_id)
+        if cid.startswith("fire_group_select_"):
+            letter = cid.rsplit("_", 1)[-1].upper()
+            if letter not in _FIRE_GROUP_LETTERS:
+                return
+            label = f"Fire Group {letter}"
+            src = str(source or "HOTKEY").upper()
+            if not self.key_sender.elite_foreground():
+                self.native_command_status = f"{src} {label}: ignored because Elite is not the foreground window."
+                self.bridge_hotkey_last_action = f"{time.strftime('%H:%M:%S')}  IGNORED {src} {label}"
+                self._native_command_log(f"{src} IGNORED {label} | Elite not foreground")
+                return
+            self.bridge_hotkey_last_action = f"{time.strftime('%H:%M:%S')}  {src} {label}"
+            self._native_command_log(f"{src} {label}")
+            self._qml_select_fire_group(_FIRE_GROUP_LETTERS.index(letter))
+            return
         return super()._dispatch_bridge_hotkey(command_id, source=source)
+
+    # ---- Clear + Jump additions (2026-10-25) -----------------------------------
+    def _clear_station_jump_target(self):
+        """Away from a station (a ring, a nav beacon) Clear + Jump means 'get me out': Supercruise,
+        even if an old route is still plotted. At a station the route is used as before."""
+        target, source = super()._clear_station_jump_target()
+        try:
+            at_station = bool(self._station_maneuver_context_active(180.0))
+        except Exception:
+            at_station = True
+        if target and not at_station:
+            self._native_command_log(f"Clear Station + FSD | not at a station: Supercruise instead of jumping to {target}")
+            return "", ""
+        return target, source
+
+    def _clear_station_jump_worker(self):
+        s = self.state_data
+        if not s.flag("Docked"):
+            for flag, action, name in (("Cargo Scoop", "ToggleCargoScoop", "cargo scoop"),
+                                       ("Hardpoints", "DeployHardpointToggle", "hardpoints")):
+                if not s.flag(flag):
+                    continue
+                try:
+                    binding = self._native_binding(action)
+                except RuntimeError:
+                    raise RuntimeError(f"the {name} is out and has no keyboard key in Elite, so it can't be closed.")
+                self.native_command_status = f"Clear Station + FSD: closing the {name}."
+                self._native_tap(binding, 0.08)
+                if not self._wait_for(lambda f=flag: not s.flag(f), timeout=3.0, interval=0.05):
+                    raise RuntimeError(f"the {name} didn't close; stopped before boosting.")
+                self._native_command_log(f"Clear Station + FSD | {name.upper()} CLOSED")
+        return super()._clear_station_jump_worker()
+
+    def _qml_fire_group_now(self):
+        try:
+            value = (getattr(self.state_data, "status", {}) or {}).get("FireGroup")
+            return None if value is None else int(value)
+        except Exception:
+            return None
+
+    def _qml_fire_group_blocker(self):
+        """Why a fire group change can't happen right now, or '' when it can."""
+        s = self.state_data
+        try:
+            if not (s.flag("In Main Ship") or s.flag("In Fighter")):
+                return "Fire groups only work in your ship."
+        except Exception:
+            pass
+        if self._qml_fire_group_now() is None:
+            return "I can't see your fire group yet. Elite hasn't reported it."
+        return ""
+
+    def _qml_find_hotspot(self, material):
+        """Nearest ring with a mapped hotspot for this material, from the commander's own scans."""
+        want = _hotspot_key(material)
+        best = None
+        for r in list(getattr(self, "_qml_ring_index", []) or []):
+            for k, n in (r.get("hot") or {}).items():
+                if _hotspot_key(k) == want or want in _hotspot_key(k):
+                    cand = (float(r.get("ly") or 0), -int(n or 0), r, k, int(n or 0))
+                    if best is None or cand[:2] < best[:2]:
+                        best = cand
+        if best is None:
+            return (f"I don't know any {material.title()} hotspots yet. They show up once you map a ring "
+                    f"with the surface scanner.")
+        ly, _neg, r, kind, n = best
+        here = str(getattr(self.state_data, "system", "") or "").lower() == str(r["system"]).lower()
+        spots = f"{n} {kind} hotspot{'s' if n != 1 else ''}"
+        if here:
+            return f"Right here. {r['ring']} has {spots}."
+        self.nav_quick_route(r["system"])
+        return f"Closest is {r['ring']}, {spots}, {int(round(ly))} light years. Plotting a route."
+
+    def _qml_deploy_collector(self, spoken_reply=False):
+        """COLLECTOR key / "deploy collector": switch to the collector fire group, fire it once."""
+        group, fire = getattr(self, "_qml_collector_cfg", ("A", "SECONDARY"))
+        if not bool(getattr(self, "_qml_collector_confirmed", False)):
+            msg = "Tell me where your collectors are first. Press COLLECTOR on the Mining page."
+            self.native_command_status = "Deploy Collector: " + msg
+            if not spoken_reply:
+                self._qml_say_command(msg, "collector-setup")
+            return msg
+        index = "ABCDEFGH".index(group) if group in "ABCDEFGH" else 0
+        s = self.state_data
+        blocker = self._qml_fire_group_blocker()
+        if not blocker and (s.flag("Docked") or s.flag("Supercruise") or s.flag("Landed")):
+            blocker = "Collectors only launch in normal space."
+        if not blocker:
+            try:
+                if int(s.limpet_reserve_count()) <= 0:
+                    blocker = "No limpets in the hold."
+            except Exception:
+                pass
+        if blocker:
+            self.native_command_status = f"Deploy Collector: {blocker}"
+            if not spoken_reply:
+                self._qml_say_command(blocker, "collector-blocked")
+            return blocker
+
+        def worker():
+            problem = self._qml_step_fire_group(index)
+            if problem:
+                self.native_command_status = f"Deploy Collector: {problem}"
+                self._qml_say_command(problem, "collector-fail")
+                return
+            try:
+                trigger = self._native_binding("PrimaryFire" if fire == "PRIMARY" else "SecondaryFire")
+            except RuntimeError:
+                msg = ("Primary" if fire == "PRIMARY" else "Secondary") + " Fire needs a keyboard key in Elite's controls."
+                self._qml_say_command(msg, "collector-bind")
+                raise
+            self._native_tap(trigger, pause=0.12)
+            self.native_command_status = f"Deploy Collector: fired group {group} {fire.lower()}."
+
+        self._native_begin("Deploy Collector", worker)
+        return ""
+
+    def _qml_step_fire_group(self, index):
+        """Step to fire group index with Next / Previous inside a running command. Returns a problem or ''."""
+        letter = _FIRE_GROUP_LETTERS[index]
+        start = self._qml_fire_group_now()
+        if start is None:
+            return "Elite hasn't reported a fire group yet."
+        if start == index:
+            return ""
+        up = index > start
+        try:
+            step = self._native_binding("CycleFireGroupNext" if up else "CycleFireGroupPrevious")
+        except RuntimeError:
+            return ("Next" if up else "Previous") + " Fire Group needs a keyboard key in Elite's controls."
+        for _ in range(abs(index - start)):
+            before = self._qml_fire_group_now()
+            self._native_tap(step, pause=0.05)
+            if not self._wait_for(lambda b=before: self._qml_fire_group_now() != b, timeout=1.5, interval=0.05):
+                return f"Fire group {letter} isn't set up on this ship." if up else "The fire group didn't change."
+            now = self._qml_fire_group_now()
+            if up and now is not None and before is not None and now < before:
+                return f"Fire group {letter} isn't set up on this ship."
+            if now == index:
+                return ""
+        return "" if self._qml_fire_group_now() == index else f"Couldn't reach fire group {letter}."
+
+    def _qml_select_fire_group(self, index):
+        """Step Elite's fire group to index (0 = A) with Next / Previous, checking each press."""
+        index = int(index)
+        letter = _FIRE_GROUP_LETTERS[index]
+        name = f"Fire Group {letter}"
+        blocker = self._qml_fire_group_blocker()
+        if blocker:
+            self.native_command_status = f"{name}: {blocker}"
+            self._native_command_log(f"IGNORED {name} | {blocker}")
+            self._qml_say_command(blocker, "firegroup-blocked")
+            return
+        if self._qml_fire_group_now() == index:
+            self.native_command_status = f"{name}: already selected."
+            return
+
+        def worker():
+            start = self._qml_fire_group_now()
+            if start is None:
+                raise RuntimeError("Elite hasn't reported a fire group yet.")
+            if start == index:
+                self.native_command_status = f"{name}: already selected."
+                return
+            up = index > start
+            try:
+                step = self._native_binding("CycleFireGroupNext" if up else "CycleFireGroupPrevious")
+            except RuntimeError:
+                which = "Next" if up else "Previous"
+                self._qml_say_command(f"{which} Fire Group needs a keyboard key in Elite's controls.", "firegroup-bind")
+                raise
+            problem = ""
+            for _ in range(abs(index - start)):
+                before = self._qml_fire_group_now()
+                self._native_tap(step, pause=0.05)
+                if not self._wait_for(lambda b=before: self._qml_fire_group_now() != b, timeout=1.5, interval=0.05):
+                    problem = f"Fire group {letter} isn't set up on this ship." if up else "The fire group didn't change."
+                    break
+                now = self._qml_fire_group_now()
+                if up and now is not None and before is not None and now < before:
+                    # Wrapped past the last group: this ship doesn't have the one asked for. Step back.
+                    try:
+                        back = self._native_binding("CycleFireGroupPrevious")
+                        self._native_tap(back, pause=0.05)
+                        self._wait_for(lambda n=now: self._qml_fire_group_now() != n, timeout=1.5, interval=0.05)
+                    except RuntimeError:
+                        pass
+                    problem = f"Fire group {letter} isn't set up on this ship."
+                    break
+                if now == index:
+                    break
+            final = self._qml_fire_group_now()
+            if problem or final != index:
+                problem = problem or f"Couldn't reach fire group {letter}."
+                self.native_command_status = f"{name}: {problem}"
+                self._qml_say_command(problem, "firegroup-fail")
+                return
+            self.native_command_status = f"{name}: selected."
+
+        self._native_begin(name, worker)
 
     def _start_wizard_ptt_test_recording(self, source="PTT"):
         """Use the real PTT capture path as a safe wizard proof-of-life.
@@ -7696,6 +9144,9 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         self._native_prepare_cockpit("Find Best Target")
         cycle = self._native_binding("CycleNextTarget")
         original_sig = self._qml_target_signature()
+        # Say it right away (local ship voice, no AI round trip) so a pilot who
+        # can't see the Bridge, in VR for example, knows the controls are busy.
+        self._qml_say_sweep_result("Sweeping contacts.")
 
         # Survey: cycle through contacts until the cycle is proven complete (a
         # strong identity seen again, or the hull pattern repeating), or 18 taps.
@@ -7866,17 +9317,6 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             )
             return
 
-        legal_suffix = ""
-        if str(found.get("legal") or "UNKNOWN").upper() not in {"UNKNOWN", "-"}:
-            legal_suffix = f" • {str(found['legal']).upper()}"
-        group_suffix = f" • likely in a group of {current_best.get('group')}" if int(current_best.get("group", 1)) > 1 else ""
-        self.native_command_status = f"Best target found: {found['ship']}{legal_suffix}{group_suffix}."
-        spoken_bits = [f"Best target: {found['ship']}"]
-        if str(found.get("legal") or "UNKNOWN").upper() not in {"UNKNOWN", "-"}:
-            spoken_bits.append(str(found["legal"]).lower())
-        if int(current_best.get("group", 1)) > 1:
-            spoken_bits.append(f"likely in a group of {int(current_best.get('group'))}")
-        self._qml_say_sweep_result(", ".join(spoken_bits) + ".")
         try:
             for c in list(getattr(self, "_qml_sweep_contacts", []) or []):
                 c["best"] = c["ship"].casefold() == str(found["ship"]).casefold() and (
@@ -7885,8 +9325,9 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                     break
         except Exception:
             pass
+        final = self._qml_scan_best_target(found, current_best)
         self._native_command_log(
-            f"BEST TARGET | ship={found['ship']} legal={found.get('legal','UNKNOWN')} rank_score={current_best.get('rank_score')} group={current_best.get('group')} contacts={len(contacts)} reacquire_taps={taps}"
+            f"BEST TARGET | ship={found['ship']} legal={final.get('legal','UNKNOWN')} outcome={final.get('outcome')} rank_score={current_best.get('rank_score')} group={current_best.get('group')} contacts={len(contacts)} reacquire_taps={taps}"
         )
         try:
             self._qml_best_target_history.append(
@@ -7894,6 +9335,81 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             )
         except Exception:
             pass
+
+    _QML_SWEEP_SCAN_WAIT = 10.0
+
+    @staticmethod
+    def _qml_spoken_credits(value):
+        try:
+            v = int(value)
+        except Exception:
+            return ""
+        if v <= 0:
+            return ""
+        if v >= 1_000_000:
+            m = round(v / 1_000_000, 1)
+            return f"{m:g} million credits"
+        if v >= 1_000:
+            return f"{round(v / 1_000):,} thousand credits"
+        return f"{v:,} credits"
+
+    def _qml_scan_best_target(self, found, best):
+        """Hold the winner until Elite finishes its scan, then say whether it is
+        WANTED (with bounty) or CLEAN. Returns {outcome, legal}."""
+        s = self.state_data
+        ship = str(found.get("ship") or "target")
+        ship_key = ship.casefold()
+        group = int(best.get("group", 1) or 1)
+        group_bit = f", likely in a group of {group}" if group > 1 else ""
+
+        def still_locked():
+            return str(getattr(s, "target_ship", "-") or "-").casefold() == ship_key
+
+        def stage():
+            try:
+                return int(getattr(s, "target_scan_stage", 0) or 0)
+            except Exception:
+                return 0
+
+        legal = str(found.get("legal") or "UNKNOWN").upper()
+        if legal in ("UNKNOWN", "-") or stage() < 3:
+            self.native_command_status = f"Best target: {ship}{group_bit}. Scanning..."
+            self._qml_say_sweep_result(f"Best target: {ship}{group_bit}. Scanning.")
+            self._wait_for(lambda: stage() >= 3 or not still_locked(), self._QML_SWEEP_SCAN_WAIT, 0.1)
+            if not still_locked():
+                self.native_command_status = f"Find Best Target: lost the lock on the {ship} before the scan finished."
+                self._qml_say_sweep_result(f"Lost the lock on the {ship}.")
+                return {"outcome": "lost", "legal": "UNKNOWN"}
+            row = self._qml_observe_target_candidate(-2, settle=0.05) or found  # also remembers CLEAN for the next sweep
+            if stage() < 3:
+                self.native_command_status = f"Best target: {ship}{group_bit}. Still scanning; close in to finish."
+                self._qml_say_sweep_result(f"The {ship} is still being scanned. Close in to finish it.")
+                return {"outcome": "scanning", "legal": "UNKNOWN"}
+            found = row
+            legal = str(found.get("legal") or "UNKNOWN").upper()
+            lead = f"The {ship}"
+        else:
+            lead = f"Best target: {ship}{group_bit}. It"
+
+        if found.get("wanted"):
+            bounty = self._qml_spoken_credits(getattr(s, "target_bounty", None))
+            self.native_command_status = f"Best target: {ship} • WANTED" + (f" • {bounty}" if bounty else "") + (f" • group of {group}" if group > 1 else "") + "."
+            self._qml_say_sweep_result(f"{lead} is wanted" + (f". Bounty {bounty}." if bounty else "."))
+            return {"outcome": "wanted", "legal": "WANTED"}
+        if found.get("clean"):
+            who = "a system authority ship" if found.get("authority") else "clean"
+            self.native_command_status = f"Best target: {ship} is {who.upper() if who == 'clean' else who}. Not a valid target. Run the sweep again to check the next one."
+            line = f"{lead} is {who}. Not a valid target."
+            if self._voice_level_value() >= 3:
+                now = time.monotonic()
+                if now - float(getattr(self, "_qml_scan_again_hint_mono", 0.0) or 0.0) > 60.0:
+                    self._qml_scan_again_hint_mono = now
+                    line += " Say scan again to check the next one."
+            self._qml_say_sweep_result(line)
+            return {"outcome": "clean", "legal": "CLEAN"}
+        self.native_command_status = f"Best target: {ship} • {legal}."
+        self._qml_say_sweep_result(f"{lead} is {legal.lower()}.")
+        return {"outcome": "other", "legal": legal}
 
     def _qml_say_sweep_result(self, text):
         """The one spoken line of a Find Best Target sweep (callouts are muted while it runs)."""
@@ -8027,6 +9543,42 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             pass
         return True
 
+    # ---- Route confirmation doesn't need Elite in front (2026-10-28) -----------
+    # By this point every key has gone out; confirming only reads FSDTarget / NavRoute.json.
+    # .95 aborted the check with "Elite lost foreground focus" when the pilot alt-tabbed to the
+    # Bridge to see what was happening (a tester on one monitor). Now the check keeps going; only
+    # closing the Galaxy Map needs Elite in front, and it's skipped (map left open) if it isn't.
+    def _covas_verify_route(self, text, galaxy, baseline_revision, deadline):
+        if not self.nav_armed:
+            self.nav_log("Portable route aborted at COVAS route verification: navigation was DISARMED.")
+            return
+        confirmed, fsd_target, route_dest, target_match, route_match = self._portable_route_matches(text, baseline_revision)
+        if confirmed:
+            proof = []
+            if target_match:
+                proof.append(f"FSDTarget={fsd_target}")
+            if route_match:
+                proof.append(f"NavRoute.json={route_dest}")
+            self.nav_log("ROUTE CONFIRMED using COVAS choreography + clipboard: " + ", ".join(proof)
+                         + f". Closing Galaxy Map in {legacy.NAV_DELAY_AFTER_CONFIRM_MS/1000:.1f}s.")
+            self.after(legacy.NAV_DELAY_AFTER_CONFIRM_MS, lambda: self._qml_close_map_if_front(text, galaxy))
+            return
+        if time.monotonic() >= deadline:
+            self.nav_log(f"ROUTE NOT CONFIRMED for {text}. Last FSD target={fsd_target or '-'}; "
+                         f"NavRoute destination={route_dest or '-'}. Galaxy Map LEFT OPEN for inspection. No mouse fallback was used.")
+            return
+        self.after(legacy.NAV_VERIFY_POLL_MS, lambda: self._covas_verify_route(text, galaxy, baseline_revision, deadline))
+
+    def _qml_close_map_if_front(self, text, galaxy):
+        try:
+            front = self.key_sender.elite_foreground()
+        except Exception:
+            front = False
+        if not front:
+            self.nav_log(f"Portable route complete: Elite confirmed {text}; Galaxy Map left open (Elite wasn't in front).")
+            return
+        self._portable_step_close_map(text, galaxy)
+
     # ---- Galaxy Map must really be open before any map keys go out ----------
     # .95 pressed the map key in the same instant it focused Elite (the key could
     # be lost), then after 5 s without GuiFocus=6 it carried on and sent zoom /
@@ -8035,7 +9587,112 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     # once more if needed, otherwise stop with nothing else sent.
     _QML_MAP_SETTLE_MS = 300
 
+    # ---- Shared galaxy map keys (2026-10-29, from a tester's support file + video) -----
+    # Inside the Galaxy Map, Elite gives a key to the map camera when it is bound to both a
+    # camera control and a UI key. A pilot with W/A/S/D on UI Up/Left/Down/Right and on camera
+    # move got a map that slid forward instead of opening the search box, and every later
+    # step missed. Before any map key goes out: use the keyboard slot that the camera doesn't
+    # share; if both clash, stop and say which key.
+    _QML_MAP_CAM_ACTIONS = (
+        "CamPitchUp", "CamPitchDown", "CamYawLeft", "CamYawRight",
+        "CamTranslateForward", "CamTranslateBackward", "CamTranslateLeft", "CamTranslateRight",
+        "CamTranslateUp", "CamTranslateDown", "CamZoomIn", "CamZoomOut", "CamTranslateZHold",
+        "GalaxyMapHome",
+    )
+    _QML_PLOT_UI_ACTIONS = ("UI_Up", "UI_Left", "UI_Right", "UI_Select")
+    _QML_PLOT_UI_LABELS = {"UI_Up": "UI Up", "UI_Left": "UI Left", "UI_Right": "UI Right", "UI_Select": "UI Select"}
+
+    def _qml_keyboard_slots(self, action):
+        root = getattr(self.bindings, "root", None)
+        elem = root.find(action) if root is not None else None
+        out = []
+        if elem is None:
+            return out
+        for slot in ("Primary", "Secondary"):
+            node = elem.find(slot)
+            if node is None or node.attrib.get("Device") != "Keyboard" or not node.attrib.get("Key"):
+                continue
+            mods = [m.attrib["Key"] for m in node.findall("Modifier")
+                    if m.attrib.get("Device") == "Keyboard" and m.attrib.get("Key")]
+            out.append({"action": action, "slot": slot, "key": node.attrib["Key"], "modifiers": mods})
+        return out
+
+    @staticmethod
+    def _qml_key_sig(binding):
+        return (binding["key"], frozenset(binding.get("modifiers") or ()))
+
+    def _qml_key_text(self, binding):
+        try:
+            parts = [self.bindings.key_display(m) for m in binding.get("modifiers") or ()]
+            parts.append(self.bindings.key_display(binding["key"]))
+            return "+".join(parts)
+        except Exception:
+            return str(binding.get("key", "?"))
+
+    def _qml_map_camera_keys(self):
+        cams = {}
+        for act in self._QML_MAP_CAM_ACTIONS:
+            for b in self._qml_keyboard_slots(act):
+                cams.setdefault(self._qml_key_sig(b), act)
+        return cams
+
+    def _qml_plot_binding(self, action):
+        """(binding, clash): the first keyboard slot the map camera doesn't share, else the clash."""
+        slots = self._qml_keyboard_slots(action)
+        cams = self._qml_map_camera_keys()
+        clash = None
+        for b in slots:
+            cam = cams.get(self._qml_key_sig(b))
+            if cam is None:
+                return b, None
+            clash = clash or (b, cam)
+        return None, clash
+
+    def _nav_binding_required(self, action):
+        if action in self._QML_PLOT_UI_ACTIONS:
+            binding, clash = self._qml_plot_binding(action)
+            if binding:
+                return binding
+            if clash:
+                b, cam = clash
+                raise RuntimeError(f"{self._QML_PLOT_UI_LABELS.get(action, action)} shares {self._qml_key_text(b)} "
+                                   f"with the Galaxy Map camera ({cam})")
+        return super()._nav_binding_required(action)
+
+    def _qml_plot_key_clashes(self):
+        out = []
+        for action in self._QML_PLOT_UI_ACTIONS:
+            binding, clash = self._qml_plot_binding(action)
+            if binding is None and clash:
+                b, cam = clash
+                out.append((action, self._qml_key_text(b), cam))
+        return out
+
+    def _qml_plot_keys_ok(self, text):
+        """False (and says why) when a key the plot needs is also a Galaxy Map camera key."""
+        try:
+            clashes = self._qml_plot_key_clashes()
+        except Exception as exc:
+            self.nav_log(f"Route plot: key check skipped ({exc}).")
+            return True
+        if not clashes:
+            return True
+        detail = "; ".join(f"{self._QML_PLOT_UI_LABELS.get(a, a)} = {k} = Galaxy Map {cam}" for a, k, cam in clashes)
+        self.nav_log(f"ROUTE NOT PLOTTED for {text}: shared Galaxy Map keys ({detail}). In the Galaxy Map Elite "
+                     "gives these keys to the camera, so the search box can't be reached. Fix: give "
+                     + ", ".join(self._QML_PLOT_UI_LABELS.get(a, a) for a, _, _ in clashes)
+                     + " a key the Galaxy Map camera doesn't use (Elite: Options > Controls > Interface Mode). "
+                     "No keys were sent.")
+        a, k, _ = clashes[0]
+        others = [self._QML_PLOT_UI_LABELS.get(x, x) for x, _, _ in clashes[1:]]
+        also = f", and so do {' and '.join(others)}" if others else ""
+        self._qml_say_command(f"{self._QML_PLOT_UI_LABELS.get(a, a)} shares {k} with the galaxy map camera{also}. "
+                              "Route not plotted.", "plot-key-clash")
+        return False
+
     def _covas_begin_route(self, text, current_system, galaxy_already_open, distance_ly, zoom_wait_time, timing_error):
+        if not self._qml_plot_keys_ok(text):
+            return
         if galaxy_already_open:
             return super()._covas_begin_route(text, current_system, galaxy_already_open, distance_ly, zoom_wait_time, timing_error)
         if not self._nav_ready():
@@ -8208,6 +9865,63 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     # (stall). Logging only: nothing about the command's behaviour changes.
     _QML_DIAG_COMMANDS = {"Docking Protocol"}
 
+    # ---- Docking tab sweep: give Elite time to answer (2026-11-01) -------------
+    # A pilot's support file: 6 of 12 docking runs said "no docking response", yet the
+    # journal shows Elite answered every time (granted, or denied for distance) on tab 4 or
+    # 5. .95 waited only 0.85 s after Select; on that PC the Bridge read Elite's files up to
+    # 1.6 s late, so the sweep moved on, pressed Left / Right / Select on other tabs and
+    # called it a fail. Same sweep, but each Select waits up to 2.5 s for the reply, and one
+    # last look before giving up (a late reply counts).
+    _QML_DOCK_REPLY_WAIT_S = 2.5
+    _QML_DOCK_LATE_WAIT_S = 2.0
+
+    def _request_docking_tab_sweep(self, binds, start_revision, max_tabs=5):
+        s = self.state_data
+        docking_events = {"DockingRequested", "DockingGranted", "DockingDenied", "DockingCancelled"}
+
+        def gui():
+            return int((s.status or {}).get("GuiFocus", 0) or 0)
+
+        def replied(before):
+            return (int(getattr(s, "docking_revision", 0) or 0) > before
+                    and str(getattr(s, "last_docking_event", "") or "") in docking_events)
+
+        def done(attempt, late=False):
+            event = str(getattr(s, "last_docking_event", "") or "DockingRequested")
+            self._native_command_log(f"Docking TAB SWEEP | {event} confirmed on attempt {attempt}"
+                                     + (" (late reply)" if late else ""))
+            try:
+                self._native_tap(binds["UI_Back"], 0.08)
+            except Exception:
+                pass
+            return event
+
+        self._native_tap(binds["FocusLeftPanel"], 0.08)
+        if not self._wait_for(lambda: gui() == 2, 1.2, 0.04):
+            raise RuntimeError("External panel did not become active (GuiFocus 2).")
+        self._native_command_log(f"Docking TAB SWEEP | starting from pilot's current left-panel tab | max={int(max_tabs)} "
+                                 f"| reply wait {self._QML_DOCK_REPLY_WAIT_S:.1f} s")
+        first_revision = int(start_revision or 0)
+        for attempt in range(1, int(max_tabs) + 1):
+            if gui() != 2:
+                self._native_tap(binds["FocusLeftPanel"], 0.08)
+                self._wait_for(lambda: gui() == 2, 0.6, 0.04)
+            self.native_command_status = f"Request Docking: checking left-panel tab {attempt}/{int(max_tabs)}..."
+            self._native_command_log(f"Docking TAB SWEEP | attempt {attempt}/{int(max_tabs)}")
+            before = max(first_revision, int(getattr(s, "docking_revision", 0) or 0))
+            self._native_tap(binds["UI_Left"], 0.10)
+            self._native_tap(binds["UI_Right"], 0.10)
+            self._native_tap(binds["UI_Select"], 0.18)
+            if self._wait_for(lambda: replied(before), self._QML_DOCK_REPLY_WAIT_S, 0.04):
+                return done(attempt)
+            if attempt < int(max_tabs):
+                self._native_tap(binds["CyclePreviousPanel"], 0.10)
+                time.sleep(0.06)
+        # one last look: a reply to any of the Selects above still counts
+        if self._wait_for(lambda: replied(first_revision), self._QML_DOCK_LATE_WAIT_S, 0.05):
+            return done(int(max_tabs), late=True)
+        return None
+
     def poll_status(self):
         now = time.monotonic()
         last = self.__dict__.get("_qml_poll_mono")
@@ -8216,7 +9930,35 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             self._qml_diag_poll_gap = max(float(self.__dict__.get("_qml_diag_poll_gap", 0.0)), now - last)
         return super().poll_status()
 
+    # 2026-10-25: a Stream Deck / keyboard shortcut can still be holding Ctrl, Alt or Shift when
+    # the Bridge starts pressing Elite keys. Elite (and Windows) would then see a different combo:
+    # Next Fire Group (Alt+Shift+L) + a held Ctrl became the Bridge's own LAUNCH hotkey.
+    _QML_MOD_VKS = (0x10, 0x11, 0x12, 0x5B, 0x5C)   # Shift, Ctrl, Alt, left / right Windows key
+
+    def _qml_wait_modifiers_up(self, timeout=0.8):
+        if sys.platform != "win32":
+            return True
+        gen = int(getattr(self, "native_command_generation", 0) or 0)
+        if self.__dict__.get("_qml_modwait_gave_up") == gen:
+            return False                 # already waited once this command; don't stall every key
+        try:
+            user32 = ctypes.windll.user32
+        except Exception:
+            return True
+        deadline = time.monotonic() + float(timeout)
+        while True:
+            held = [vk for vk in self._QML_MOD_VKS if user32.GetAsyncKeyState(vk) & 0x8000]
+            if not held:
+                return True
+            if time.monotonic() >= deadline:
+                self._native_command_log(f"KEYS | modifier still held after {timeout:.1f} s ({', '.join(hex(v) for v in held)}); pressing anyway")
+                self._qml_modwait_gave_up = gen
+                return False
+            self._native_cancel_guard()
+            time.sleep(0.02)
+
     def _native_tap(self, binding, pause=0.10):
+        self._qml_wait_modifiers_up()
         if not self.__dict__.get("_qml_diag_on"):
             return super()._native_tap(binding, pause)
         t0 = time.monotonic()
@@ -8271,7 +10013,13 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             self._qml_say_command("Emergency escape has the controls. Say cancel first.", "egress-owns")
         if name == "Auto Launch":
             self._qml_launch_started_mono = time.monotonic()
-        return super()._native_begin(name, worker)
+
+        def tracked(_w=worker, _n=name):
+            try:
+                _w()
+            finally:
+                self._qml_last_finished = (_n, time.monotonic())
+        return super()._native_begin(name, tracked)
 
     def cancel_current_command(self, reason="Pilot cancel"):
         self._qml_last_cancel_mono = time.monotonic()
@@ -8281,6 +10029,15 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         result = super().cancel_current_command(reason)
         # Route plotting runs outside the command lock; CANCEL stops it too.
         plot_stopped = self._qml_cancel_route_plot(reason)
+        if not result and not plot_stopped:
+            # Nothing to stop. If a command ended a moment ago, say so, so a
+            # cancel that arrives just late doesn't sound like the Bridge forgot.
+            last = getattr(self, "_qml_last_finished", None)
+            try:
+                if last and time.monotonic() - float(last[1]) < 12.0:
+                    self.native_command_status = f"{last[0]} already finished a moment ago. Nothing is running now."
+            except Exception:
+                pass
         if result and launch_running and handoff:
             self._native_command_log("SESSION RULE | Auto Launch cancelled -> Clear Station + FSD handoff dropped")
             self._qml_say_command("Clear and jump cancelled too.", "handoff-cancelled")
@@ -8327,7 +10084,7 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             return False
         # Hardpoints normally own the distributor, except when Emergency Egress
         # explicitly asks for the ENG-heavy escape profile.
-        if self._qml_weapons_priority_active() and mode_key not in {"WEAPONS", "COMBAT", "EGRESS"}:
+        if self._qml_weapons_priority_active() and mode_key not in {"WEAPONS", "COMBAT", "EGRESS", "MINING"}:
             self._dynamic_pips_log(f"{mode} IMMEDIATE BLOCKED | hardpoints own distributor | {reason}")
             return False
         return super()._dynamic_pips_apply_now(mode, reason)
@@ -8349,6 +10106,8 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     @staticmethod
     def _qml_dynamic_pips_voice_phrase(mode):
         mode = str(mode or "").upper()
+        if mode == "MINING":
+            return "Mining power. Weapons and shields."
         if mode in {"WEAPONS", "COMBAT"}:
             return "Power to weapons."
         if mode in {"RECOVERY", "STATION_SAFETY"}:
@@ -8387,11 +10146,22 @@ class HeadlessBridgeApp(legacy.BridgeApp):
         # generated or translated by the LLM.
         self._voice_say("HIGH", phrase, kind="PIPS", key=f"pips:{phrase}", cooldown=8.0)
 
+    def _qml_mining_pips(self):
+        """MINING instead of WEAPONS: the ship carries mining tools and there's no fight going on."""
+        s = self.state_data
+        try:
+            if s.combat_active or s.wanted_target_prearmed() or bool(getattr(self, "_qml_combat_intent_active", False)):
+                return False
+        except Exception:
+            return False
+        items = list(getattr(s, "qml_loadout_items", []) or [])
+        return any(it.startswith("hpt_mining") for it in items)
+
     def _dynamic_pips_desired_mode(self):
         if bool(self.dynamic_pips_var.get()) and self._qml_weapons_priority_active():
             s = self.state_data
             if s.flag("In Main Ship") and not s.flag("Docked") and not s.flag("Supercruise") and not s.flag("FSD Jump"):
-                return "WEAPONS"
+                return "MINING" if self._qml_mining_pips() else "WEAPONS"
         return super()._dynamic_pips_desired_mode()
 
     def _maybe_dynamic_pips(self):
@@ -8426,13 +10196,20 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                 and not s.flag("FSD Jump")
             )
             self._station_safety_pips_release("Hardpoints deployed // absolute weapons priority")
-            self.dynamic_pip_mode = "WEAPONS"
+            wmode = "MINING" if self._qml_mining_pips() else "WEAPONS"
+            wlabel = legacy.DYNAMIC_PIP_PRESETS[wmode]["display"]
+            self.dynamic_pip_mode = wmode
+            if getattr(self, "_qml_pips_wmode", None) != wmode:
+                # switching MINING <-> WEAPONS (a fight starts or ends) gets a fresh pair of attempts,
+                # so a profile that couldn't verify never blocks the other one
+                self._qml_pips_wmode = wmode
+                self._qml_weapons_priority_attempts = 0
             if not valid_ship_flight:
                 self.dynamic_pip_status = "WEAPONS priority armed; waiting for normal main-ship flight."
                 return
 
             now = time.monotonic()
-            expected = list(legacy.DYNAMIC_PIP_PRESETS["WEAPONS"]["expected"])
+            expected = list(legacy.DYNAMIC_PIP_PRESETS[wmode]["expected"])
             pending = getattr(self, "dynamic_pip_pending_verify", None)
 
             # One transaction owns the distributor until its verification window closes.
@@ -8440,31 +10217,34 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                 try:
                     mode, due, pending_expected = pending
                 except Exception:
-                    mode, due, pending_expected = "WEAPONS", now, expected
+                    mode, due, pending_expected = wmode, now, expected
                 if now < float(due or 0.0):
                     return
                 current = self._dynamic_pips_current()
                 self.dynamic_pip_pending_verify = None
+                expected = list(pending_expected or expected)
+                wmode = mode if mode in ("WEAPONS", "MINING") else wmode
+                wlabel = legacy.DYNAMIC_PIP_PRESETS[wmode]["display"]
                 if current == expected:
-                    self.dynamic_pip_last_applied = "WEAPONS"
+                    self.dynamic_pip_last_applied = wmode
                     self._qml_weapons_priority_attempts = 0
-                    self.dynamic_pip_status = "WEAPONS verified: 1 SYS / 1 ENG / 4 WEP."
-                    self._dynamic_pips_log(f"VERIFIED WEAPONS | {self._dynamic_pips_display(current)}")
-                    self._qml_announce_verified_dynamic_pips(("WEAPONS", due, expected))
+                    self.dynamic_pip_status = f"{wmode} verified: {wlabel}."
+                    self._dynamic_pips_log(f"VERIFIED {wmode} | {self._dynamic_pips_display(current)}")
+                    self._qml_announce_verified_dynamic_pips((wmode, due, expected))
                 else:
                     attempts = int(getattr(self, "_qml_weapons_priority_attempts", 0) or 0)
                     self.dynamic_pip_status = (
-                        f"WEAPONS verification mismatch ({self._dynamic_pips_display(current)}); "
+                        f"{wmode} verification mismatch ({self._dynamic_pips_display(current)}); "
                         + ("one retry remains." if attempts < 2 else "retry limit reached; no loop will be started.")
                     )
-                    self._dynamic_pips_log(f"VERIFY MISMATCH WEAPONS | expected {expected} | observed {current} | attempt {attempts}/2")
+                    self._dynamic_pips_log(f"VERIFY MISMATCH {wmode} | expected {expected} | observed {current} | attempt {attempts}/2")
                 return
 
             current = self._dynamic_pips_current()
             if current == expected:
-                self.dynamic_pip_last_applied = "WEAPONS"
+                self.dynamic_pip_last_applied = wmode
                 self._qml_weapons_priority_attempts = 0
-                self.dynamic_pip_status = "WEAPONS held: 1 SYS / 1 ENG / 4 WEP."
+                self.dynamic_pip_status = f"{wmode} held: {wlabel}."
                 return
 
             if getattr(self, "native_command_busy", False):
@@ -8478,12 +10258,12 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                 return
 
             applied = super()._dynamic_pips_apply_now(
-                "WEAPONS",
+                wmode,
                 f"Hardpoints deployed // exclusive weapons transaction attempt {attempts + 1}/2",
             )
             if applied:
                 self._qml_weapons_priority_attempts = attempts + 1
-                self.dynamic_pip_candidate = "WEAPONS"
+                self.dynamic_pip_candidate = wmode
                 self.dynamic_pip_candidate_since = now
             return
 
@@ -9779,7 +11559,7 @@ class HeadlessBridgeApp(legacy.BridgeApp):
             if action_mode == "Suggest Only":
                 return {"ok": True, "status": "suggest_only", "service": service, "message": "Service was not run because action mode is Suggest Only."}
             if action_mode == "Ask Before Acting":
-                self.copilot_pending_action = {"type": "station_service", "service": service, "created": datetime.now().isoformat(timespec="seconds")}
+                self.copilot_pending_action = {"type": "station_service", "service": service, "created": time.strftime("%Y-%m-%dT%H:%M:%S")}
                 self.after(0, self.refresh_copilot_widgets)
                 return {"ok": True, "status": "pending_approval", "service": service, "message": f"{service.title()} is waiting for commander approval."}
             box = {}
@@ -9902,6 +11682,19 @@ SETUP_OVERRIDE_DEFAULTS = {
     "ai_context": "",
     "ai_context_seeded": False,
     "hotkey_overrides": {},
+    # 2026-10-25 session debrief: say the last session's summary when the Bridge starts (once per session)
+    "debrief_on_start": True,
+    "debrief_announced": 0,
+    # 2026-10-25: merit callouts and the AI's "sale earned no merits" comments. Off: most
+    # commanders don't play Powerplay even when pledged.
+    "powerplay_callouts": False,
+    # 2026-10-25 Mining page LOOKING FOR: up to 3 commodities the commander wants to find
+    "mining_wanted": [],
+    "raw_targets": {},          # 2026-10-28: {"Iron": 150}, set by tapping a raw on Mining > RHINO + RAW
+    # 2026-10-25 COLLECTOR key: which fire group and trigger launch collector limpets
+    "collector_group": "A",
+    "collector_fire": "SECONDARY",
+    "collector_confirmed": False,          # the commander has told the Bridge where collectors are
 }
 
 
@@ -10353,6 +12146,12 @@ class BridgeHost:
             mode = "Auto Navigation"          # includes the retired "Ask Before Acting"
         data["ai_tool_mode"] = mode
         data["ai_smart_auto"] = bool(data.get("ai_smart_auto", False))
+        g = str(data.get("collector_group") or "A").strip().upper()[:1]
+        data["collector_group"] = g if g in "ABCDEFGH" and g else "A"
+        data["collector_fire"] = "PRIMARY" if str(data.get("collector_fire") or "").upper() == "PRIMARY" else "SECONDARY"
+        wanted = data.get("mining_wanted")
+        data["mining_wanted"] = [str(x).strip()[:40] for x in wanted if str(x).strip()][:3] if isinstance(wanted, list) else []
+        data["raw_targets"] = _raw_targets_clean(data.get("raw_targets"))
         data["ai_context"] = str(data.get("ai_context") or "").strip()[:1000]
         if not bool(data.get("ai_context_seeded", False)):
             if not data["ai_context"]:
@@ -10779,6 +12578,699 @@ class BridgeHost:
             out.append(row)
         return out
 
+    # ---- MINING page (2026-10-25) ----------------------------------------------
+    # Prices come from the same market search the Trade page uses: the best place within
+    # MINING_SELL_LY that buys the commodity. Looked up once per commodity and kept a while.
+    MINING_SELL_LY = 60
+    MINING_PRICE_TTL = 1800.0
+    MINING_KEEP, MINING_MAYBE = 10000, 3000      # rock score (cr per ton of rock) for MINE / MAYBE
+    _MINING_HIGH_VALUE = {"platinum", "painite", "osmium", "palladium", "gold", "lowtemperaturediamonds",
+                          "lowtemperaturediamond", "voidopals", "voidopal", "monazite", "musgravite", "grandidierite",
+                          "alexandrite", "benitoite", "serendibite", "rhodplumsite", "bromellite", "taaffeite", "jadeite"}
+    _MINING_KIT = [
+        ("REFINERY", ("int_refinery",)),
+        ("COLLECTORS", ("dronecontrol_collection", "multidronecontrol_mining", "multidronecontrol_universal")),
+        ("PROSPECTORS", ("dronecontrol_prospector", "multidronecontrol_mining", "multidronecontrol_universal")),
+        ("MINING LASERS", ("hpt_mininglaser", "hpt_miningtool")),
+        ("PULSE WAVE", ("hpt_mrascanner",)),
+        ("SURFACE SCANNER", ("int_detailedsurfacescanner",)),
+        ("CORE KIT", ("hpt_mining_seismchrgwarhd",)),
+    ]
+
+    def _mining_price(self, name):
+        key = legacy.market_commodity_key(name)
+        cache = self.__dict__.setdefault("_mining_prices", {})
+        hit = cache.get(key)
+        now = time.time()
+        if hit and now - hit.get("ts", 0) < self.MINING_PRICE_TTL:
+            return hit
+        want = self.__dict__.setdefault("_mining_price_want", [])
+        if key and key not in want:
+            want.append(key)
+            cache.setdefault(key, {"ts": 0, "name": name})["name"] = name
+        return hit if hit and hit.get("price") else None
+
+    def _mining_price_pump(self):
+        """One market lookup at a time, in the background."""
+        if self.__dict__.get("_mining_price_busy"):
+            return
+        want = self.__dict__.get("_mining_price_want") or []
+        if not want:
+            return
+        app = self.app
+        system = str(getattr(app.state_data, "system", "") or "").strip()
+        if not system or system == "-":
+            return
+        key = want.pop(0)
+        cache = self.__dict__.setdefault("_mining_prices", {})
+        name = (cache.get(key) or {}).get("name") or key
+        self._mining_price_busy = True
+
+        def worker():
+            row = {"ts": time.time(), "name": name, "price": 0}
+            try:
+                rows = app.market_search_engine.search(
+                    system, name, "SELL", 1, self.MINING_SELL_LY, 7, True,
+                    origin_coords=getattr(app.state_data, "system_pos", None)) or []
+                best = None
+                for r in rows:
+                    price = int(r.get("price") or r.get("sell_price") or 0)
+                    if price > 0 and (best is None or price > best[0]):
+                        best = (price, r)
+                if best:
+                    r = best[1]
+                    row.update({"price": best[0], "station": str(r.get("station") or "-"), "system": str(r.get("system") or "-"),
+                                "ly": round(float(r.get("distance_ly") or 0.0), 1),
+                                "pad": legacy.BridgeApp._market_pad_label(r.get("pad"))})
+            except Exception as exc:
+                row["error"] = str(exc)[:120]
+                row["ts"] = time.time() - self.MINING_PRICE_TTL + 300   # try again in 5 minutes
+            finally:
+                cache[key] = row
+                self._mining_price_busy = False
+
+        threading.Thread(target=worker, daemon=True, name="MiningPrice").start()
+
+    MINING_WANTED_PCT = 5.0
+
+    def _mining_wanted_hit(self, rock):
+        """The first LOOKING FOR material in this rock at 5% or more, as (name, pct), else None."""
+        wanted = {legacy.market_commodity_key(w): w for w in (self.setup_overrides.get("mining_wanted") or [])}
+        if not wanted:
+            return None
+        for mat in rock.get("materials") or []:
+            if legacy.market_commodity_key(mat["name"]) in wanted and float(mat.get("pct") or 0) >= self.MINING_WANTED_PCT:
+                return mat["name"], float(mat["pct"])
+        ml = rock.get("motherlode")
+        if ml and legacy.market_commodity_key(ml) in wanted:
+            return str(ml), 100.0
+        return None
+
+    def _mining_verdict(self, rock):
+        hit = self._mining_wanted_hit(rock)
+        rock["wanted"] = hit[0] if hit else ""
+        if rock.get("motherlode"):
+            return "CORE", 0
+        score = 0
+        known = True
+        for mat in rock.get("materials") or []:
+            hit = self._mining_price(mat["name"])
+            mat["price"] = int(hit["price"]) if hit and hit.get("price") else 0
+            if not mat["price"]:
+                known = False
+            score += mat["pct"] / 100.0 * mat["price"]
+        score = int(score)
+        if score >= self.MINING_KEEP or hit:
+            return "MINE", score
+        if not known and any(legacy.market_commodity_key(m["name"]) in self._MINING_HIGH_VALUE and m["pct"] >= 10
+                             for m in rock.get("materials") or []):
+            return "MINE", score
+        if score >= self.MINING_MAYBE:
+            return "MAYBE", score
+        return ("SKIP" if known else "?"), score
+
+    # ---- Prospector callouts (2026-10-25) ------------------------------------
+    # A new prospector result is spoken in two parts when the price isn't known yet: the material
+    # right away ("Platinum, 31 percent, high content. Checking value."), then the verdict once the
+    # market lookup comes back. With the price already known it's one line. Normal talk level:
+    # only MINE and motherlodes (plus the verdict for any rock it already said "checking" on).
+    # Talkative: every rock.
+    MINING_VOICE_WAIT = 12.0
+
+    @staticmethod
+    def _mining_say_cr(v):
+        v = int(v or 0)
+        if v >= 1_000_000:
+            return f"{v / 1_000_000:.1f} million".replace(".0 ", " ")
+        if v >= 1000:
+            return f"{int(round(v / 1000.0))} thousand"
+        return f"{v}"
+
+    def _mining_voice_tick(self, m):
+        app = self.app
+        rocks = m.get("rocks") or []
+        seq = int(m.get("seq", 0))
+        st = self.__dict__.get("_mining_voice")
+        if st is None:
+            st = self._mining_voice = {"seq": seq, "pending": None}   # nothing replayed at startup is spoken
+        if seq < st["seq"]:
+            st["seq"], st["pending"] = 0, None      # LoadGame started a new game session
+            self._mining_voice_seen = {}
+        level = app._voice_level_value()
+        if seq > st["seq"]:
+            st["seq"] = seq
+            st["pending"] = None
+            r = rocks[0] if rocks else None
+            if r and r.get("live") and int(r.get("seq", 0)) == seq and level >= 2 \
+                    and time.time() - float(r.get("ts") or 0) < 60:
+                rock = {"materials": [dict(x) for x in r.get("materials") or []], "motherlode": r.get("motherlode"),
+                        "content": r.get("content"), "remaining": r.get("remaining", 100)}
+                hit = self._mining_wanted_hit(rock)
+                if hit:
+                    pct = "motherlode" if hit[1] >= 100 else f"{int(round(hit[1]))} percent"
+                    text = _vary_fmt("mine-wanted", [
+                        "Found {m}, {p}. That's on your list.", "{m}, {p}. You were looking for that.",
+                        "There's your {m}. {p}.", "{m} found, {p}. Mine it."], m=hit[0], p=pct)
+                    # a valuable material in the same rock gets a mention too (known high-value list, 10%+)
+                    extra = [x for x in rock["materials"] if x["name"] != hit[0] and float(x["pct"]) >= 10
+                             and legacy.market_commodity_key(x["name"]) in self._MINING_HIGH_VALUE]
+                    if extra:
+                        x = max(extra, key=lambda r: r["pct"])
+                        text += f" Also {int(round(float(x['pct'])))} percent {x['name']}."
+                    app._voice_say("MED", text, kind="INFO", key=f"prospect:{seq}", cooldown=0)
+                    return
+                if rock["motherlode"]:
+                    app._voice_say("MED", _vary_fmt("mine-core", [
+                        "Motherlode. {m}. Crack it.", "Core rock. {m} inside. Crack it.", "That's a motherlode. {m}.",
+                        "Motherlode found. {m}. Get the charges on it.", "{m} motherlode. Worth cracking."], m=rock["motherlode"]),
+                        kind="INFO", key=f"prospect:{seq}", cooldown=0)
+                    return
+                verdict, _score = self._mining_verdict(rock)
+                priced = all(x.get("price") for x in rock["materials"])
+                if priced or not rock["materials"]:
+                    self._mining_voice_final(rock, verdict, seq, said_intro=False)
+                    return
+                intro = self._mining_voice_intro(rock)
+                hot = any(legacy.market_commodity_key(x["name"]) in self._MINING_HIGH_VALUE for x in rock["materials"])
+                said = False
+                if level >= 3 or hot:
+                    said = bool(app._voice_say("MED" if hot else "HIGH", intro + " " + _vary("mine-checking", [
+                        "Checking value.", "Checking the price.", "Pricing it.", "Looking up the price.", "Checking what it's worth."]), kind="INFO",
+                                               key=f"prospect:{seq}:a", cooldown=0))
+                st["pending"] = {"rock": rock, "seq": seq, "until": time.monotonic() + self.MINING_VOICE_WAIT, "said": said}
+                self._mining_price_pump()
+            return
+        p = st.get("pending")
+        if not p:
+            return
+        rock = {**p["rock"], "materials": [dict(x) for x in p["rock"]["materials"]]}
+        verdict, _score = self._mining_verdict(rock)
+        priced = all(x.get("price") for x in rock["materials"])
+        if priced or time.monotonic() >= p["until"]:
+            st["pending"] = None
+            self._mining_voice_final(rock, verdict, p["seq"], said_intro=p["said"])
+        else:
+            self._mining_price_pump()
+
+    @staticmethod
+    def _mining_voice_intro(rock):
+        mats = rock.get("materials") or []
+        if not mats:
+            return f"{str(rock.get('content') or 'medium').lower()} content rock."
+        top = mats[0]
+        text = f"{top['name']}, {int(round(float(top['pct'])))} percent, {str(rock.get('content') or 'medium').lower()} content."
+        try:
+            left = int(round(float(rock.get("remaining", 100))))
+        except Exception:
+            left = 100
+        if left < 100:
+            text += f" {left} percent left."
+        return text
+
+    def _mining_voice_final(self, rock, verdict, seq, said_intro):
+        app = self.app
+        mats = rock.get("materials") or []
+        priced = [x for x in mats if x.get("price")]
+        best = max(priced, key=lambda x: x["pct"] * x["price"]) if priced else None
+        # Say less the more often a verdict comes up: the first MAYBE of a session gets the full
+        # sentence, after that the short forms.
+        seen = self.__dict__.setdefault("_mining_voice_seen", {})
+        seen[verdict] = seen.get(verdict, 0) + 1
+        repeat = seen[verdict] > 1
+        if verdict == "MINE":
+            lead = _vary("mine-yes", ["Mine it.", "That's a keeper.", "Good rock. Mine it.", "Worth mining.", "Lasers on this one."])
+            if best:
+                tail = lead + " " + _vary_fmt("mine-price", [
+                    "{name} sells for about {p} a ton.", "{name} is going for about {p}.", "About {p} a ton for the {name}.",
+                    "{name}, about {p} a ton."], name=best["name"], p=self._mining_say_cr(best["price"]))
+            else:
+                name = next((x["name"] for x in mats if legacy.market_commodity_key(x["name"]) in self._MINING_HIGH_VALUE), "it")
+                tail = f"{lead} No price yet, but {name} is worth mining."
+            need = "MED"
+        elif verdict == "MAYBE":
+            tail = _vary("mine-maybe-short", ["Maybe.", "Borderline.", "So-so.", "It'll do.", "Middling."]) if repeat else \
+                _vary("mine-maybe", ["Maybe. Worth it if nothing better is close.", "Borderline. Mine it if nothing better turns up.",
+                                     "It'll do in a pinch.", "Middling rock. Your call."])
+            need = "MED" if said_intro else "HIGH"
+        elif verdict == "SKIP":
+            tail = _vary("mine-skip", ["Skip it.", "Pass.", "Not worth it.", "Leave it.", "Move on."])
+            need = "MED" if said_intro else "HIGH"
+        else:
+            tail = _vary("mine-noprice", ["No price found for it.", "Couldn't find a price.", "No market for that nearby."])
+            need = "MED" if said_intro else "HIGH"
+        text = tail if said_intro else f"{self._mining_voice_intro(rock)} {tail}"
+        app._voice_say(need, text, kind="INFO", key=f"prospect:{seq}:b", cooldown=0)
+
+    def _mining_extras(self, snap):
+        app = self.app
+        s = app.state_data
+        m = getattr(s, "qml_mining", None) or {"rocks": [], "refined": {}, "first": 0.0, "last": 0.0,
+                                                 "prospectors": 0, "collectors": 0, "cracked": 0, "rings": {}, "hot": {}}
+        page_open = int(getattr(app, "_qml_ui_context_page", 0) or 0) == 13
+        now = time.time()
+        try:
+            self._mining_voice_tick(m)
+        except Exception:
+            pass
+        try:
+            self._rhino_voice_tick(m)
+        except Exception:
+            pass
+        active = page_open or (m.get("last") and now - float(m["last"]) < 1800) or (m["rocks"] and now - float(m["rocks"][0]["ts"]) < 1800)
+        # rocks
+        rocks = []
+        for i, r in enumerate(m["rocks"][:60]):
+            rr = {"content": r["content"], "remaining": r["remaining"], "motherlode": r["motherlode"], "seq": int(r.get("seq", 0)),
+                  "materials": [dict(x) for x in r["materials"]], "age": int(max(0, now - float(r["ts"] or now)))}
+            if active:
+                rr["verdict"], rr["score"] = self._mining_verdict(rr)
+            else:
+                rr["verdict"], rr["score"], rr["wanted"] = "?", 0, ""
+            rocks.append(rr)
+        # THIS RUN log (rocks and refined tons, newest first)
+        log_rows = []
+        for row in list(m.get("log") or []):
+            age = int(max(0, now - float(row.get("ts") or now)))
+            if row.get("kind") == "rock":
+                rk = {"materials": [dict(x) for x in row.get("materials") or []], "motherlode": row.get("motherlode")}
+                verdict = self._mining_verdict(rk)[0] if active else "?"
+                mats = rk["materials"]
+                log_rows.append({"kind": "ROCK", "age": age, "verdict": verdict,
+                                 "main": (f"{mats[0]['name']} {int(round(float(mats[0]['pct'])))}%" if mats else "-"),
+                                 "rest": ("MOTHERLODE " + str(rk["motherlode"])) if rk["motherlode"]
+                                         else "  ".join(f"{x['name']} {int(round(float(x['pct'])))}%" for x in mats[1:3])})
+            else:
+                items = sorted((row.get("items") or {}).items(), key=lambda kv: -kv[1])
+                log_rows.append({"kind": "REFINED", "age": age, "verdict": "",
+                                 "main": "  ".join(f"{n} {c} T" for n, c in items[:3]),
+                                 "rest": ("  ".join(f"{n} {c} T" for n, c in items[3:])) if len(items) > 3 else "",
+                                 "tons": sum(c for _n, c in items)})
+        # ROCKS CHECKED header: every rock this run (the log keeps 40)
+        rock_rows = [r for r in log_rows if r["kind"] == "ROCK"]
+        checked = sum(1 for r in (m.get("log") or []) if r.get("kind") == "rock")
+        worth = sum(1 for r in rock_rows if r["verdict"] in ("MINE", "CORE"))
+        # haul
+        haul = []
+        tons = value = 0
+        for name, n in sorted(m["refined"].items(), key=lambda kv: -kv[1]):
+            hit = self._mining_price(name) if active else None
+            price = int(hit["price"]) if hit and hit.get("price") else 0
+            haul.append({"name": name, "tons": n, "price": price, "value": n * price})
+            tons += n
+            value += n * price
+        span_h = max(1.0 / 60, (float(m["last"]) - float(m["first"])) / 3600.0) if m["first"] and m["last"] else 0
+        per_hour = int(value / span_h) if span_h and tons >= 3 else 0
+        # hold: where to sell what's in it (limpets don't count)
+        sell = []
+        for item in list(getattr(s, "cargo", []) or []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("Name_Localised") or item.get("Name") or "")
+            key = legacy.market_commodity_key(name)
+            if not key or key in ("limpet", "drones"):
+                continue
+            try:
+                count = int(item.get("Count") or 0)
+            except Exception:
+                count = 0
+            hit = self._mining_price(name) if active else None
+            sell.append({"name": legacy.pretty_name(name) if hasattr(legacy, "pretty_name") else name, "tons": count,
+                         "price": int(hit["price"]) if hit and hit.get("price") else 0,
+                         "station": (hit or {}).get("station", ""), "system": (hit or {}).get("system", ""),
+                         "ly": (hit or {}).get("ly", -1), "pad": (hit or {}).get("pad", "")})
+        sell.sort(key=lambda r: -(r["tons"] * r["price"]))
+        # kit check
+        items = list(getattr(s, "qml_loadout_items", []) or [])
+        kit = [{"label": label, "ok": any(any(p in it for p in pats) for it in items)} for label, pats in self._MINING_KIT]
+        try:
+            limpets = int(s.limpet_reserve_count())
+        except Exception:
+            limpets = -1
+        # rings: this system from the live journal, then everything nearby from history
+        rings = []
+        scanner = getattr(self, "colony_site_scanner", None)
+        if scanner is not None and scanner.done:
+            try:
+                rings = scanner.ring_rows(getattr(s, "system_pos", None), max_ly=300.0, limit=120)
+            except Exception:
+                rings = []
+        live_hot = dict(m.get("hot") or {})
+        for r in rings:
+            if r["ring"] in live_hot:
+                r["hot"] = live_hot[r["ring"]]
+        known = {r["ring"] for r in rings}
+        for name, r in (m.get("rings") or {}).items():
+            if name not in known:
+                rows = dict(r)
+                rows.update({"ly": 0.0, "hot": live_hot.get(name, {})})
+                rings.insert(0, rows)
+        # 2026-10-27 ring finder: rings with hotspots for the LOOKING FOR list come first
+        wanted = [w for w in (self.setup_overrides.get("mining_wanted") or [])]
+        wkeys = {_hotspot_key(w): w for w in wanted}
+        def wanted_hits(hot):
+            return [(k, n) for k, n in hot.items() if _hotspot_key(k) in wkeys]
+        self.app._qml_ring_index = [dict(r) for r in rings]          # for "find me a Platinum hotspot"
+        ranked = sorted(rings, key=lambda r: (0 if wanted_hits(r.get("hot") or {}) else 1,
+                                              float(r.get("ly") or 0) if wanted_hits(r.get("hot") or {}) else 0))
+        ring_rows = []
+        here = str(getattr(s, "system", "") or "")
+        for r in ranked[:14]:
+            hot = r.get("hot") or {}
+            hits = wanted_hits(hot)
+            ring_rows.append({"ring": r["ring"], "system": r["system"], "cls": r["cls"], "reserve": r["reserve"],
+                              "ls": r["ls"], "ly": r["ly"], "mapped": bool(hot),
+                              "wanted": bool(hits), "here": str(r["system"]).lower() == here.lower(),
+                              "wantedHot": "  ".join(f"{k.upper()} x{n}" for k, n in sorted(hits, key=lambda kv: -kv[1])),
+                              "hotspots": "  ".join(f"{n} {k.upper()}" for k, n in sorted(hot.items(), key=lambda kv: -kv[1]))})
+        self._mining_ring_rows = ring_rows
+        # which panels are empty, so the ? tour only mentions the EXAMPLE when one shows
+        app._qml_mining_empty = {0: not rocks, 1: not rocks, 2: not haul, 3: not sell[:8], 4: not ring_rows}
+        snap["mining"] = {
+            "rocks": rocks, "checked": checked, "worthIt": worth, "haul": haul,
+            "wanted": list(self.setup_overrides.get("mining_wanted") or []),
+            "collectorGroup": str(self.setup_overrides.get("collector_group") or "A"),
+            "collectorFire": str(self.setup_overrides.get("collector_fire") or "SECONDARY"),
+            "collectorConfirmed": bool(self.setup_overrides.get("collector_confirmed", False)), "haulTons": tons, "haulValue": value, "perHour": per_hour,
+            "runMinutes": int(span_h * 60) if span_h else 0,
+            "prospectors": int(m.get("prospectors", 0)), "collectors": int(m.get("collectors", 0)), "cracked": int(m.get("cracked", 0)),
+            "limpets": limpets, "kit": kit, "sell": sell[:8], "rings": ring_rows,
+            "sellLy": self.MINING_SELL_LY,
+            "srv": self._rhino_extras(m, active, now),
+            "pricing": bool(self.__dict__.get("_mining_price_busy") or self.__dict__.get("_mining_price_want")),
+        }
+        if active:
+            self._mining_price_pump()
+
+    # ---- ENGINEERING page (2026-10-28): journal facts only ------------------------
+    _ENGINEER_ORDER = {"Unlocked": 0, "Invited": 1, "Acquainted": 2, "Known": 3, "Barred": 4}
+
+    def _engineering_extras(self, snap):
+        s = self.app.state_data
+        engineers = sorted((dict(v) for v in (getattr(s, "qml_engineers", None) or {}).values()),
+                           key=lambda r: (self._ENGINEER_ORDER.get(r["progress"], 5), -int(r.get("rank") or 0), r["name"]))
+        inv = dict(getattr(s, "material_inventory", {}) or {})
+        names = dict(getattr(s, "material_display_names", {}) or {})
+        cats = dict(getattr(s, "qml_material_category", None) or {})
+        mats = {"Manufactured": [], "Encoded": []}
+        for k, n in inv.items():
+            c = cats.get(k)
+            if c in mats and int(n or 0) > 0:
+                mats[c].append({"name": str(names.get(k) or k).upper(), "count": int(n)})
+        for c in mats:
+            mats[c].sort(key=lambda r: (-r["count"], r["name"]))
+        snap["engineering"] = {
+            "modules": list(getattr(s, "qml_engineered", None) or []),
+            "stored": list(getattr(s, "qml_stored_engineered", None) or []),
+            "engineers": [{"name": r["name"].upper(), "progress": r["progress"].upper(), "rank": int(r.get("rank") or 0),
+                           "rankProgress": int(r.get("rankProgress") or 0)} for r in engineers],
+            "unlocked": sum(1 for r in engineers if r["progress"] == "Unlocked"),
+            "manufactured": mats["Manufactured"], "encoded": mats["Encoded"],
+            "known": bool(getattr(s, "material_inventory_seeded", False)),
+        }
+
+    # ---- RHINO / SRV surface mining (2026-10-27) --------------------------------
+    def _rhino_extras(self, m, active, now):
+        s = self.app.state_data
+        srv = dict(m.get("srv") or {})
+        refined = dict(srv.get("refined") or {})
+        tons = value = 0
+        haul = []
+        for name, n in sorted(refined.items(), key=lambda kv: -kv[1]):
+            hit = self._mining_price(name) if active else None
+            price = int(hit["price"]) if hit and hit.get("price") else 0
+            haul.append({"name": name, "tons": n, "value": n * price})
+            tons += n
+            value += n * price
+        span_h = (float(srv.get("last") or 0) - float(srv.get("first") or 0)) / 3600.0
+        per_hour = int(value / max(span_h, 1.0 / 60)) if span_h > 0 and tons >= 3 else 0
+        cols = []
+        for c in list(srv.get("collections") or [])[:8]:
+            items = sorted((c.get("items") or {}).items(), key=lambda kv: -kv[1])
+            cols.append({"tons": sum(n for _k, n in items), "what": "  ".join(f"{k} {n} T" for k, n in items[:3]),
+                         "age": int(max(0, now - float(c.get("last") or now)))})
+        locs = dict(getattr(s, "qml_mining_locs", None) or {})
+        body = str(getattr(s, "qml_body", "") or "")
+        system = str(getattr(s, "system", "") or "")
+        near = sorted(((b, n) for b, n in locs.items() if system and b.lower().startswith(system.lower())),
+                      key=lambda kv: (kv[0] != body, -kv[1]))
+        raws = sorted((srv.get("raws") or {}).items(), key=lambda kv: -kv[1])
+        return {"in": bool(srv.get("in")), "rhino": bool(srv.get("rhino")), "name": str(srv.get("name") or ""),
+                "cargo": int(srv.get("cargo") or 0), "hold": _RHINO_HOLD if srv.get("rhino") else 0,
+                "tons": tons, "value": value, "perHour": per_hour, "haul": haul[:6],
+                "collections": cols, "count": len(srv.get("collections") or []),
+                "raws": "  ".join(f"{k.upper()} {n}" for k, n in raws[:8]),
+                "body": body, "locsHere": int(locs.get(body, 0)) if body else 0,
+                "locs": [{"body": b, "count": n, "here": b == body} for b, n in near[:6]]}
+
+    def _rhino_voice_tick(self, m):
+        """Spoken lines for the Rhino, facts only: a rig collection when its burst ends, the
+        Rhino hold reaching 72 t, and how many mining locations a fresh surface map found."""
+        app = self.app
+        srv = m.get("srv") or {}
+        st = self.__dict__.get("_rhino_voice")
+        if st is None:
+            st = self._rhino_voice = {"seq": int(srv.get("seq", 0)), "full": False, "locs": None}
+        if int(srv.get("seq", 0)) < st["seq"]:
+            st["seq"] = 0                              # LoadGame started a new session
+        level = app._voice_level_value()
+        cols = srv.get("collections") or []
+        c = cols[0] if cols else None
+        if c and int(c.get("seq", 0)) > st["seq"] and time.time() - float(c.get("last") or 0) >= _RHINO_BURST_S:
+            st["seq"] = int(c["seq"])
+            if c.get("live") and level >= 2 and time.time() - float(c["last"]) < 90:
+                items = sorted((c.get("items") or {}).items(), key=lambda kv: -kv[1])
+                n = sum(k for _x, k in items)
+                what = items[0][0] if len(items) == 1 else f"{items[0][0]} and {items[1][0]}"
+                app._voice_say("MED", _vary_fmt("rhino-rig", [
+                    "Rig collected. {n} tons of {w}.", "{n} tons of {w} from that rig.",
+                    "Rig emptied. {n} tons, {w}.", "Collection done. {n} tons of {w}."],
+                    n=n, w=what), kind="INFO", key=f"rhino-rig:{c['seq']}", cooldown=0)
+        full = bool(srv.get("in") and srv.get("rhino") and int(srv.get("cargo") or 0) >= _RHINO_HOLD)
+        if full and not st["full"] and level >= 1:
+            app._voice_say("HIGH", "Rhino hold is full. Seventy two tons.", kind="WARN", key="rhino-full", cooldown=30)
+        st["full"] = full
+        said = getattr(app.state_data, "qml_mining_locs_said", None)
+        if said and said != st["locs"]:
+            st["locs"] = said
+            body, n, ts = said
+            if level >= 2 and time.time() - float(ts or 0) < 60:
+                app._voice_say("MED", _vary_fmt("rhino-locs", [
+                    "Surface mapped. {n} mining locations.", "{n} planetary mining locations on this one.",
+                    "Map complete. {n} mining locations down there."], n=n), kind="INFO", key=f"rhino-locs:{body}", cooldown=0)
+
+    # ---- SESSION DEBRIEF (2026-10-25) -------------------------------------------
+    def _debrief_extras(self, snap):
+        snap["setupDebriefOnStart"] = bool(self.setup_overrides.get("debrief_on_start", True))
+        snap["setupPowerplayCallouts"] = bool(self.setup_overrides.get("powerplay_callouts", False))
+        self.app._qml_powerplay_callouts = snap["setupPowerplayCallouts"]
+        self.app._qml_collector_cfg = (str(self.setup_overrides.get("collector_group") or "A"),
+                                       str(self.setup_overrides.get("collector_fire") or "SECONDARY"))
+        self.app._qml_collector_confirmed = bool(self.setup_overrides.get("collector_confirmed", False))
+        try:
+            self._limpet_voice_tick()
+        except Exception:
+            pass
+        try:
+            snap["raws"] = self._raws_extras()
+        except Exception:
+            snap["raws"] = []
+        snap["egressPhase"] = str(getattr(self.app, "egress_phase", "IDLE") or "IDLE")
+        try:
+            self.app._qml_egress_voice_tick()
+        except Exception:
+            pass
+        now = time.monotonic()
+        if not self.__dict__.get("_debrief_busy") and now >= float(self.__dict__.get("_debrief_next", 0.0)):
+            self._debrief_next = now + 20.0
+            self._debrief_busy = True
+            threading.Thread(target=self._debrief_worker, daemon=True, name="Debrief").start()
+        snap["debrief"] = dict(self.__dict__.get("_debrief") or {"ready": False})
+        pending = self.__dict__.get("_debrief_pending")
+        if pending:
+            app = self.app
+            if app._wizard_runtime_paused() or getattr(app, "startup_voice_gate_active", False):
+                self._debrief_open_mono = 0.0
+            elif not self.__dict__.get("_debrief_open_mono"):
+                self._debrief_open_mono = now
+            elif now - self._debrief_open_mono >= 6.0:
+                self._debrief_pending = None
+                text = pending["spoken"] + self._debrief_hold_sentence(pending)
+                try:
+                    said = bool(app._voice_say("LOW", text, kind="INFO", key="debrief-start", cooldown=0))
+                except Exception:
+                    said = False
+                if said:
+                    self.setup_overrides["debrief_announced"] = int(pending.get("start", 0))
+                    try:
+                        self._save_setup_overrides()
+                    except Exception:
+                        pass
+
+    def _debrief_worker(self):
+        try:
+            sessions = _debrief_sessions(legacy.JOURNAL_DIR)
+            if not sessions:
+                self._debrief = {"ready": True, "this": None, "last": None}
+                return
+            newest = sessions[-1]
+            try:
+                stamp = (newest[-1].name, newest[-1].stat().st_size, len(sessions))
+            except Exception:
+                stamp = None
+            cache = self.__dict__.get("_debrief_cache") or {}
+            if stamp is not None and cache.get("stamp") == stamp:
+                return
+            events = _debrief_read(newest)
+            ended = any(e.get("event") == "Shutdown" for e in events[-30:])
+            try:
+                fresh = time.time() - newest[-1].stat().st_mtime < 900
+            except Exception:
+                fresh = False
+            running = fresh and not ended
+            newest_d = _debrief_session(events)
+            if running:
+                this = newest_d
+                last = _debrief_session(_debrief_read(sessions[-2])) if len(sessions) > 1 else None
+            else:
+                this, last = None, newest_d
+            self._debrief = {"ready": True, "this": this, "last": last, "running": running}
+            self._debrief_cache = {"stamp": stamp}
+            self._debrief_maybe_announce(last)
+        except Exception as exc:
+            self._debrief = {"ready": True, "this": None, "last": None, "status": str(exc)[:120]}
+        finally:
+            self._debrief_busy = False
+
+    def _debrief_maybe_announce(self, last):
+        """Once per game session, the first time the Bridge starts after it: say the short version."""
+        if self.__dict__.get("_debrief_checked"):
+            return
+        self._debrief_checked = True
+        if not last or not last.get("busy") or not bool(self.setup_overrides.get("debrief_on_start", True)):
+            return
+        if time.time() - float(last.get("end", 0)) > 86400:
+            return
+        if int(self.setup_overrides.get("debrief_announced", 0) or 0) == int(last.get("start", 0)):
+            return
+        # Speech is muted until the startup screen hands over, so hold it and say it a few
+        # seconds after the welcome line (_debrief_extras). Marked as said only once spoken.
+        self._debrief_pending = last
+
+    # ---- Low limpets (2026-10-25): from the exact count in the hold ----------------
+    def _limpet_voice_tick(self):
+        s = self.app.state_data
+        try:
+            n = int(s.limpet_reserve_count())
+        except Exception:
+            return
+        prev = self.__dict__.get("_limpets_prev")
+        self._limpets_prev = n
+        if prev is None or n >= prev or s.flag("Docked"):
+            return                                  # only a drop while flying counts (not buying or selling)
+        for mark in (10, 5):
+            if n <= mark < prev and n > 0:
+                self.app._voice_say("MED", _vary_fmt("limpets-low", ["{n} limpets left.", "Down to {n} limpets.",
+                                                                     "Limpets low. {n} left."], n=n),
+                                    kind="WARN", key=f"limpets-{mark}", cooldown=30)
+                return
+        if n == 0 and prev > 0:
+            self.app._voice_say("LOW", _vary("limpets-out", ["Out of limpets.", "That was the last limpet.",
+                                                             "No limpets left."]), kind="WARN", key="limpets-0", cooldown=30)
+
+    # ---- Raw materials (2026-10-25): counts against the game's storage caps -------
+    _RAW_GRADES = {
+        1: ("carbon", "iron", "lead", "nickel", "phosphorus", "rhenium", "sulphur"),
+        2: ("arsenic", "chromium", "germanium", "manganese", "vanadium", "zinc", "zirconium"),
+        3: ("boron", "cadmium", "mercury", "molybdenum", "niobium", "tin", "tungsten"),
+        4: ("antimony", "polonium", "ruthenium", "selenium", "technetium", "tellurium", "yttrium"),
+    }
+    _RAW_CAP = {1: 300, 2: 250, 3: 200, 4: 150}
+
+    def _raws_extras(self):
+        s = self.app.state_data
+        inv = dict(getattr(s, "material_inventory", {}) or {})
+        seeded = bool(getattr(s, "material_inventory_seeded", False))
+        rows = []
+        prev = self.__dict__.setdefault("_raws_prev", {})
+        targets = dict(self.setup_overrides.get("raw_targets") or {})
+        for grade, names in self._RAW_GRADES.items():
+            cap = self._RAW_CAP[grade]
+            for key in names:
+                n = int(inv.get(key, 0) or 0)
+                target = int(targets.get(key.title(), 0) or 0)
+                target = target if 0 < target < cap else 0          # a target at or over the cap is just "full"
+                rows.append({"name": key.title(), "grade": grade, "count": n, "cap": cap, "known": seeded, "target": target})
+                p = prev.get(key)
+                if seeded and target and p is not None and p < target <= n:
+                    self.app._voice_say("MED", _vary_fmt("raw-target", ["{m} reached your target. {t}.", "{m} is at your {t}.",
+                                                                        "That's your {t} {m}."], m=key.title(), t=target),
+                                        kind="INFO", key=f"raw-target:{key}", cooldown=60)
+                if seeded and p is not None and p < cap <= n:
+                    self.app._voice_say("MED", _vary_fmt("raw-full", ["{m} is full. {c}.", "{m} storage full, {c}.",
+                                                                      "That's {m} maxed out at {c}."], m=key.title(), c=cap),
+                                        kind="INFO", key=f"raw-full:{key}", cooldown=60)
+                if seeded:
+                    prev[key] = n
+        return rows
+
+    def _debrief_hold_sentence(self, d):
+        """A live line about the ship as it is now (Cargo.json / Status), only for a mining session."""
+        if not d or not d.get("mining"):
+            return ""
+        try:
+            s = self.app.state_data
+            cap = int(getattr(s, "cargo_capacity", 0) or 0)
+            used = sum(int((c or {}).get("Count") or 0) for c in (getattr(s, "cargo", []) or []) if isinstance(c, dict))
+            limpets = int(s.limpet_reserve_count())
+        except Exception:
+            return ""
+        if cap <= 0:
+            return ""
+        f = used / cap
+        how = "empty" if f < 0.05 else ("about a quarter full" if f < 0.375 else ("about half full" if f < 0.625
+               else ("about three quarters full" if f < 0.9 else "full")))
+        return f" Your hold is {how}" + (f", with {limpets} limpets." if limpets > 0 else ", and you're out of limpets.")
+
+    def _debrief_say(self, which):
+        d = (self.__dict__.get("_debrief") or {}).get(which)
+        if not d:
+            text = "No game session to sum up yet." if which == "this" else "I don't have a previous session to sum up."
+        else:
+            text = d["spoken"]
+            if which == "this":
+                text = text.replace("Last time you were", "So far you've been", 1).replace("Last session,", "This session so far,", 1)
+            text += self._debrief_hold_sentence(d)
+        try:
+            self.app.voice_engine.say(text)
+        except Exception:
+            try:
+                self.app._voice_say("LOW", text, kind="INFO", key=f"debrief-{which}-{time.time()}", cooldown=0)
+            except Exception:
+                pass
+
+    def _announce_deliveries(self, deliveries):
+        """Say it once when something the commander is waiting on arrives (only ones that were seen counting down)."""
+        now = time.time()
+        pending = getattr(self, "_delivery_pending", None)
+        if pending is None:
+            pending = self._delivery_pending = {}
+        for d in deliveries:
+            k = f"{d['key']}@{d['arriveAt']}"
+            if d["arriveAt"] > now:
+                pending[k] = d
+            elif k in pending:
+                pending.pop(k, None)
+                where = str(d.get("station") or "")
+                what = str(d.get("name") or "Your module")
+                line = f"Your {what} has arrived" + (f" at {where}." if where and where != "-" else ".")
+                try:
+                    self.app._voice_say("LOW", line, kind="INFO", key=f"delivery:{k}", cooldown=0)
+                except Exception:
+                    pass
+        live = {f"{d['key']}@{d['arriveAt']}" for d in deliveries}
+        for k in [k for k in pending if k not in live]:
+            pending.pop(k, None)
+
     def _fleet_extras(self, snap):
         """2.0.2 FLEET: stored ships from the same journal scan as MY SITES."""
         scanner = getattr(self, "colony_site_scanner", None)
@@ -10794,6 +13286,13 @@ class BridgeHost:
                 except Exception:
                     r["typeName"] = str(r.get("type") or "-")
         snap["commanderFleet"] = rows
+        try:
+            deliveries = scanner.delivery_rows()
+        except Exception:
+            deliveries = []
+        snap["commanderDeliveries"] = deliveries
+        snap["commanderDeliveriesWaiting"] = sum(1 for d in deliveries if d["arriveAt"] > time.time())
+        self._announce_deliveries(deliveries)
         if not scanner.fleet_ts:
             snap["commanderFleetStatus"] = "OPEN A SHIPYARD ONCE AND YOUR STORED SHIPS SHOW UP HERE"
         else:
@@ -11093,7 +13592,9 @@ class BridgeHost:
 
                 if self.path == "/command":
                     command = str(data.get("command") or "").strip().lower()
-                    allowed = {"dock", "launch", "clear", "cancel", "nav_plot", "nav_memory_plot", "nav_memory_set", "nav_memory_capture", "combat_mode", "combat_enter", "combat_leave", "combat_threat", "combat_powerplant", "combat_best_target", "combat_egress", "combat_toggle_pips", "combat_toggle_subsystem", "combat_res_low", "combat_res_std", "combat_res_high", "combat_res_haz", "combat_res_all", "combat_res_plot", "combat_res_plot_index", "combat_fighter_1", "combat_fighter_2", "combat_fighter_recall", "combat_wing_target_1", "combat_wing_target_2", "combat_wing_target_3", "combat_navlock_1", "combat_navlock_2", "combat_navlock_3", "combat_firegroup_next", "trade_buy", "trade_sell", "trade_start", "trade_pause", "trade_config", "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent", "trade_trip_reset", "colonization_project_use_index", "colonization_find_supply", "colonization_supply_search", "save_data", "journal", "diagnostic", "cmdr_refresh", "mic_test", "hearing_test", "mic_hearing_check", "voice_test", "wizard_ptt_test", "ptt_map", "voice_toggle_input_mode", "voice_cycle_level", "voice_cycle_attention", "voice_set_attention", "ai_cycle_tool_mode", "ai_toggle_smart_auto", "ai_toggle_launch_rule", "ai_approve", "ai_reject", "clear_rules", "ai_usage_reset", "audio_rescan", "setup_preflight", "setup_binds", "setup_api_key_set", "setup_api_key_verify", "setup_setting", "station_refuel", "station_repair", "station_rearm", "control_bind", "control_bind_row", "control_clear", "control_clear_row", "control_cancel", "control_copy_hotkey", "control_set_hotkey", "control_clear_hotkey", "control_restore_hotkeys", "control_keyboard_capture_begin", "control_keyboard_capture_end", "control_conflict_ack", "ui_cue", "wizard_open", "wizard_close", "wizard_music_start", "wizard_music_stop", "wizard_runtime_gate", "wizard_narrate", "wizard_narrate_page_1", "wizard_narrate_page_2", "wizard_narrate_page_3", "wizard_narrate_page_4", "wizard_narrate_page_5", "wizard_narrate_page_6", "wizard_narrate_page_7", "page_help_start", "page_help_stop", "orientation_intro", "orientation_stopped", "orientation_complete", "ui_context", "sfx_select", "sfx_set_enabled", "sfx_import_path", "sfx_test", "sfx_reset", "audio_set_level", "audio_set_device", "voice_set_tuning"}
+                    allowed = {"dock", "launch", "clear", "cancel", "nav_plot", "nav_memory_plot", "nav_memory_set", "nav_memory_capture", "combat_mode", "combat_enter", "combat_leave", "combat_threat", "combat_powerplant", "combat_best_target", "combat_egress", "combat_toggle_pips", "combat_toggle_subsystem", "combat_res_low", "combat_res_std", "combat_res_high", "combat_res_haz", "combat_res_all", "combat_res_plot", "combat_res_plot_index", "combat_fighter_1", "combat_fighter_2", "combat_fighter_recall", "combat_wing_target_1", "combat_wing_target_2", "combat_wing_target_3", "combat_navlock_1", "combat_navlock_2", "combat_navlock_3", "combat_firegroup_next", "trade_buy", "trade_sell", "trade_start", "trade_pause", "trade_config", "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent", "trade_trip_reset", "colonization_project_use_index", "colonization_find_supply", "colonization_supply_search", "save_data", "journal", "diagnostic", "cmdr_refresh", "mic_test", "hearing_test", "mic_hearing_check", "voice_test", "wizard_ptt_test", "ptt_map", "voice_toggle_input_mode", "voice_cycle_level", "voice_cycle_attention", "voice_set_attention", "ai_cycle_tool_mode", "ai_toggle_smart_auto", "ai_toggle_launch_rule", "ai_approve", "ai_reject", "clear_rules", "ai_usage_reset", "audio_rescan", "setup_preflight", "setup_binds", "setup_api_key_set", "setup_api_key_verify", "setup_setting", "station_refuel", "station_repair", "station_rearm", "control_bind", "control_bind_row", "control_clear", "control_clear_row", "control_cancel", "control_copy_hotkey", "control_set_hotkey", "control_clear_hotkey", "control_restore_hotkeys", "control_keyboard_capture_begin", "control_keyboard_capture_end", "control_conflict_ack", "ui_cue", "wizard_open", "wizard_close", "wizard_music_start", "wizard_music_stop", "wizard_runtime_gate", "wizard_narrate", "wizard_narrate_page_1", "wizard_narrate_page_2", "wizard_narrate_page_3", "wizard_narrate_page_4", "wizard_narrate_page_5", "wizard_narrate_page_6", "wizard_narrate_page_7", "page_help_start", "page_help_stop", "orientation_intro", "orientation_stopped", "orientation_complete", "ui_context", "sfx_select", "sfx_set_enabled", "sfx_import_path", "sfx_test", "sfx_reset", "audio_set_level", "audio_set_device", "voice_set_tuning",
+                               "mining_fg_a", "mining_fg_b", "mining_fg_c", "mining_fg_d", "mining_fg_e", "mining_reset", "mining_collector", "mining_plot_ring",
+                               "debrief_say_this", "debrief_say_last"}
                     if command not in allowed:
                         self._json(400, {"ok": False, "error": f"unsupported command: {command}"})
                         return
@@ -11174,6 +13675,8 @@ class BridgeHost:
                             "auto_refuel", "auto_repair", "auto_rearm", "dynamic_pips", "auto_powerplant",
                             "auto_chaff", "auto_chaff_profile", "ai_trade_auto", "ai_mission_auto", "ai_travel_auto",
                             "ai_smart_auto", "commander_address", "ai_context", "ai_tool_mode", "bridge_mode",
+                            "debrief_on_start", "powerplay_callouts", "mining_wanted", "collector_group", "collector_fire", "collector_confirmed",
+                            "raw_targets",
                         }
                         if name not in allowed_setup_names:
                             self._json(400, {"ok": False, "error": "valid setup setting name required"})
@@ -11181,6 +13684,17 @@ class BridgeHost:
                         value = data.get("value")
                         if name == "ai_context":
                             value = str(value or "").strip()[:1000]
+                        elif name == "mining_wanted":
+                            value = [x.strip()[:40] for x in str(value or "").split(",") if x.strip()][:3]
+                        elif name == "raw_targets":
+                            value = _raw_targets_clean(value)
+                        elif name == "collector_group":
+                            value = str(value or "A").strip().upper()[:1]
+                            if not value or value not in "ABCDEFGH":
+                                self._json(400, {"ok": False, "error": "fire group A to H"})
+                                return
+                        elif name == "collector_fire":
+                            value = "PRIMARY" if str(value or "").upper() == "PRIMARY" else "SECONDARY"
                         elif name == "commander_address":
                             value = str(value or "Commander").strip()[:120]
                         elif name == "ai_tool_mode":
@@ -11220,7 +13734,7 @@ class BridgeHost:
                             page = int(data.get("page", 0))
                         except Exception:
                             page = -1
-                        if page < 0 or page > 12:
+                        if page < 0 or page > 13:
                             self._json(400, {"ok": False, "error": "valid page index required"})
                             return
                         item["page"] = page
@@ -11238,10 +13752,15 @@ class BridgeHost:
                             page = int(data.get("page", 0))
                         except Exception:
                             page = 0
-                        page = max(0, min(11, page))
+                        page = max(0, min(14, page))
                         workspace = str(data.get("workspace") or "main").strip().lower()[:80]
                         item["page"] = page
                         item["workspace"] = workspace
+                    if command == "mining_plot_ring":
+                        try:
+                            item["index"] = int(data.get("index", -1))
+                        except Exception:
+                            item["index"] = -1
                     if command == "combat_res_plot_index":
                         try:
                             idx = int(data.get("index", -1))
@@ -11469,6 +13988,18 @@ class BridgeHost:
                 self._fleet_extras(snap)
             except Exception:
                 snap["commanderFleet"] = []
+            try:
+                self._debrief_extras(snap)
+            except Exception as exc:
+                snap["debrief"] = {"ready": False, "status": f"DEBRIEF ERROR // {str(exc)[:80].upper()}"}
+            try:
+                self._mining_extras(snap)
+            except Exception as exc:
+                snap["mining"] = {"status": f"MINING DATA ERROR // {str(exc)[:80].upper()}"}
+            try:
+                self._engineering_extras(snap)
+            except Exception as exc:
+                snap["engineering"] = {"status": f"ENGINEERING DATA ERROR // {str(exc)[:80].upper()}"}
             self.shared.set(snap)
         except Exception as exc:
             snap = self.shared.get()
@@ -11668,6 +14199,27 @@ class BridgeHost:
                     self.app.start_auto_launch()
                 elif command == "clear":
                     self.app.start_clear_station_jump()
+                elif command.startswith("mining_fg_"):
+                    self.app._qml_select_fire_group("abcde".index(command[-1]))
+                elif command == "mining_collector":
+                    self.app._qml_deploy_collector()
+                elif command == "mining_plot_ring":
+                    rows = list(self.__dict__.get("_mining_ring_rows") or [])
+                    idx = int(item.get("index", -1))
+                    if 0 <= idx < len(rows):
+                        r = rows[idx]
+                        if r.get("here"):
+                            self.app._qml_say_command(f"{r['ring']} is in this system.", "ring-here")
+                        else:
+                            self.app.nav_quick_route(r["system"])
+                            self.app._qml_say_command(f"Plotting a route to {r['system']}.", "ring-plot")
+                elif command in ("debrief_say_this", "debrief_say_last"):
+                    self._debrief_say("this" if command.endswith("this") else "last")
+                elif command == "mining_reset":
+                    st = self.app.state_data
+                    m = getattr(st, "qml_mining", None)
+                    if m is not None:
+                        m.update({"refined": {}, "first": 0.0, "last": 0.0, "prospectors": 0, "collectors": 0, "cracked": 0, "rocks": [], "log": []})
                 elif command == "cancel":
                     self.app.cancel_current_command("QML dashboard")
                 elif command == "cmdr_refresh":
@@ -11813,7 +14365,7 @@ class BridgeHost:
                 elif command == "page_help_stop":
                     self.app.after(0, self.app._page_help_stop)
                 elif command == "ui_context":
-                    page = max(0, min(10, int(item.get("page", 0))))
+                    page = max(0, min(14, int(item.get("page", 0))))
                     workspace = str(item.get("workspace") or "main").strip().lower()
                     def _set_ui_context():
                         self.app._qml_ui_context_page = page
@@ -12142,6 +14694,14 @@ class BridgeHost:
                             elif name == "auto_powerplant":
                                 self.app.auto_powerplant_var.set(bool(value))
                                 self.app._auto_powerplant_toggle_changed()
+                                self.setup_overrides[name] = bool(value); self._save_setup_overrides()
+                            elif name in ("debrief_on_start", "powerplay_callouts"):
+                                self.setup_overrides[name] = bool(value); self._save_setup_overrides()
+                            elif name == "mining_wanted":
+                                self.setup_overrides[name] = list(value); self._save_setup_overrides()
+                            elif name in ("collector_group", "collector_fire"):
+                                self.setup_overrides[name] = str(value); self._save_setup_overrides()
+                            elif name == "collector_confirmed":
                                 self.setup_overrides[name] = bool(value); self._save_setup_overrides()
                             elif name == "auto_chaff":
                                 self.app.auto_chaff_var.set(bool(value))

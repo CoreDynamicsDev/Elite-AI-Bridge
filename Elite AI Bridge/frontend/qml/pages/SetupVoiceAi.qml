@@ -1,7 +1,7 @@
 // SETUP > VOICE & AI (page 6). How the ship sounds and talks, what it hears, and what the AI may do.
 // Plain layout on purpose (setup-plan.md): title, one sentence, then the controls.
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic   // Basic style: the native Windows style refuses custom backgrounds (console warning)
 import "../skin"
 
 Item {

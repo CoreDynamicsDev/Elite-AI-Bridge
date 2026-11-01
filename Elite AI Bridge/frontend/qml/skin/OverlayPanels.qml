@@ -10,7 +10,7 @@ Item {
     property string activity: "IDLE"
     property string detail: ""
     property string title: ""              // overrides the state's own words when set
-    property var rows: []                  // [{speaker: "CMDR"|"BRIDGE", text}]
+    property var rows: []                  // [{speaker: "CMDR"|"BRIDGE"|"SHIP", text}]
     property real f: 1.0                   // size factor (SMALL 0.62, STANDARD 1, LARGE 1.42)
     property real see: 0.82                // panel opacity (HOW SOLID)
     property bool showActivity: true
@@ -44,6 +44,16 @@ Item {
 
     FrameAnimation { running: ov.animate && ov.visible; onTriggered: ov.t = (ov.t + frameTime) % 4.0 }
 
+    // 2026-10-25: emergency states (EMERGENCY ESCAPE, SHIELDS DOWN, SHIP DANGER) turn the whole
+    // overlay red and pulse, so it reads at a glance in a fight.
+    readonly property bool alarm: activity === "CRITICAL"
+    property real alarmPulse: 0
+    SequentialAnimation on alarmPulse {
+        loops: Animation.Infinite; running: ov.alarm && ov.visible
+        NumberAnimation { from: 0; to: 1; duration: 450; easing.type: Easing.OutQuad }
+        NumberAnimation { from: 1; to: 0; duration: 650; easing.type: Easing.InQuad }
+    }
+
     component Glass: Item {
         id: g
         property color edge: "#4a4c44"
@@ -70,6 +80,8 @@ Item {
         visible: ov.showActivity
         width: ov.activityW; height: ov.activityH
         Glass { anchors.fill: parent }
+        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: 5 * ov.f; visible: ov.alarm
+                    color: Theme.bad; opacity: 0.10 + 0.22 * ov.alarmPulse }
 
         // mini voice scope (shared with the module column)
         VoiceScope {
@@ -114,7 +126,9 @@ Item {
         visible: ov.showChat
         y: ov.showActivity ? ov.activityH + ov.gap : 0
         width: ov.chatW; height: ov.chatH
-        Glass { anchors.fill: parent; tint: "#c98a2c" }
+        Glass { anchors.fill: parent; tint: ov.alarm ? Theme.bad : "#c98a2c" }
+        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: 5 * ov.f; visible: ov.alarm
+                    color: Theme.bad; opacity: 0.05 + 0.10 * ov.alarmPulse }
         Text { x: 18 * ov.f; y: 9 * ov.f; text: "AI COMMS"; color: "#d9a54a"
                font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * ov.f); font.letterSpacing: 3 * ov.f }
         Rectangle { x: 18 * ov.f; y: 32 * ov.f; width: parent.width - 32 * ov.f; height: 1; color: "#6e5a32"; opacity: 0.8 }
@@ -134,9 +148,11 @@ Item {
                         required property int index
                         readonly property int fromEnd: Math.min(6, (ov.rows || []).length) - 1 - index
                         readonly property bool cmdr: String(modelData.speaker || "").toUpperCase() === "CMDR"
+                        readonly property bool ship: String(modelData.speaker || "").toUpperCase() === "SHIP"   // 2026-10-28: ship voice lines
                         width: lines.width; spacing: 8 * ov.f
                         opacity: Math.max(0.3, 1 - fromEnd * 0.16)
-                        Text { width: 66 * ov.f; text: parent.cmdr ? "CMDR" : "BRIDGE"; color: parent.cmdr ? Theme.plateText : Theme.ok
+                        Text { width: 66 * ov.f; text: parent.cmdr ? "CMDR" : (parent.ship ? "SHIP" : "BRIDGE")
+                               color: parent.cmdr ? Theme.plateText : (parent.ship ? Theme.info : Theme.ok)
                                font.family: Theme.crtFont; font.pixelSize: Math.max(10, 20 * ov.f) }
                         Text { width: parent.width - 74 * ov.f; text: String(modelData.text || ""); color: parent.cmdr ? Theme.plateText : Theme.phosphor
                                wrapMode: Text.WordWrap; maximumLineCount: 4; elide: Text.ElideRight
@@ -145,5 +161,14 @@ Item {
                 }
             }
         }
+    }
+
+    // red frame around everything while an emergency is on
+    Rectangle {
+        anchors.fill: parent
+        visible: ov.alarm
+        color: "transparent"; radius: 6 * ov.f
+        border.color: Theme.bad; border.width: Math.max(2, 4 * ov.f)
+        opacity: 0.45 + 0.55 * ov.alarmPulse
     }
 }

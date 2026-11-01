@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.0.5 - 2026-11-01
+
+### New
+- MINING page (between COMMANDER and SETUP): a verdict on every prospected rock (MINE, MAYBE,
+  SKIP, CORE) with value per ton, spoken callouts and a live asteroid; rocks checked by
+  material; a LOOKING FOR list; HAUL, HOLD + KIT and WHERE TO SELL; RINGS NEAR YOU with
+  hotspots and plotting; RHINO + RAW for surface mining in the SRV and all 28 raw materials
+  with targets; fire group, COLLECTOR, CLEAR + JUMP and NEW RUN keys; a spoken tour.
+- ENGINEERING page: engineered modules on your ship and in storage, engineers, and
+  manufactured and encoded materials.
+- Commander: DELIVERIES (modules and ships on their way) and SESSION DEBRIEF; ODD STATS is
+  one scrolling list.
+- Fire groups A to H by Bridge shortcut keys and voice.
+- Emergency Escape talks through each step and turns the overlay and header red; pirate
+  callouts.
+- Find Best Target announces the sweep, scans the winner and says if it's wanted.
+- Ship voice: varied wording for common lines; on TALKATIVE, arrival lines after each jump
+  and cargo scan callouts. What the ship says shows in the overlay chat panel.
+- New startup sound.
+
+### Fixes
+- Auto dock waits up to 2.5 s for the station's reply on each panel tab and counts a late
+  reply, instead of cycling past the right tab and reporting a fail.
+- Route plot: when a UI key is also a galaxy map camera key, the Bridge uses the other key
+  for that control or says which key is shared. Plotting keeps going if you switch to the
+  Bridge window while it confirms.
+- Clear + Jump closes the cargo scoop and retracts hardpoints first; away from a station it
+  goes to supercruise.
+- Window not opening on some PCs: Qt's display DLLs are loaded before the window, and the
+  installer no longer builds the runtime on the Microsoft Store Python.
+- Launcher: the shortcuts run START_HERE.bat, which checks the runtime and opens a repair
+  window if it is missing. New Start menu shortcut: Repair Elite AI Bridge.
+- Bridge key presses wait for Ctrl, Alt, Shift and Windows to be released.
+
 ## 2.0.4 - 2026-10-24
 
 ### New

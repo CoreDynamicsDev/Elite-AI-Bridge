@@ -11,6 +11,43 @@ Item {
     property string noticeLevel: "info"
     signal masterCautionPressed()
     signal updatePressed()
+    signal deliveriesPressed()
+
+    // 2026-10-25: the status screen shows the next delivery when nothing more important is
+    // going on (the update has its own tag beside the version, so it no longer takes the screen)
+    readonly property var deliveries: bridge.commanderDeliveries || []
+    property real nowSec: Date.now() / 1000
+    Timer { interval: 1000; repeat: true; running: hdr.deliveries.length > 0; onTriggered: hdr.nowSec = Date.now() / 1000 }
+    readonly property var headerDelivery: {
+        var best = null
+        for (var i = 0; i < deliveries.length; i++) {
+            var d = deliveries[i], at = Number(d.arriveAt)
+            if (at <= nowSec - 600) continue                  // arrived over 10 min ago: Commander page only
+            if (best === null) { best = d; continue }
+            var bAt = Number(best.arriveAt)
+            if (at > nowSec && (bAt <= nowSec || at < bAt)) best = d   // prefer the soonest still coming
+        }
+        return best
+    }
+    readonly property var arrivingDelivery: {
+        for (var i = 0; i < deliveries.length; i++) {
+            var left = Number(deliveries[i].arriveAt) - nowSec
+            if (left <= 10 && left > -10) return deliveries[i]
+        }
+        return null
+    }
+    function deliveryLines(d) {
+        var left = Number(d.arriveAt) - nowSec
+        var more = deliveries.length > 1 ? "  +" + (deliveries.length - 1) : ""
+        if (left > 0)
+            return [hms(left) + " // " + d.name, "DELIVERY // " + d.station + more, Theme.info]
+        return ["ARRIVED // " + d.name, "DELIVERY // " + d.station + more, Theme.ok]
+    }
+    function hms(sec) {
+        sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60
+        function two(n) { return (n < 10 ? "0" : "") + n }
+        return h > 0 ? h + ":" + two(m) + ":" + two(x) : m + ":" + two(x)
+    }
 
     readonly property real s: Theme.s
     readonly property bool tourActive: app.firstOrientationActive || bridge.pageHelpActive
@@ -254,19 +291,26 @@ Item {
         height: 110 * hdr.s
         pad: 10 * hdr.s
         readonly property bool inControl: bridge.controlOwner !== "NONE" && bridge.controlOwner !== ""
+        readonly property bool showsDelivery: String(lines[1]).indexOf("DELIVERY // ") === 0
+        MouseArea { anchors.fill: parent; enabled: statusBezel.showsDelivery; cursorShape: Qt.PointingHandCursor
+                    onClicked: hdr.deliveriesPressed() }
         readonly property var lines: {
             if (hdr.notice !== "")
                 return [hdr.notice, hdr.noticeDetail, hdr.noticeLevel === "bad" ? Theme.bad : (hdr.noticeLevel === "ok" ? Theme.ok : Theme.info)]
             if (!bridge.connected)
                 return [bridge.bridgeState, bridge.bridgeMessage, bridge.bridgeLevel === "bad" ? Theme.bad : Theme.info]
+            // Emergency Escape: red, with the step it's on (same words as the in-game overlay)
+            if (bridge.controlOwner === "EMERGENCY_EGRESS")
+                return ["EMERGENCY ESCAPE", bridge.bridgeActivityDetail || "GETTING YOU CLEAR // CANCEL TO STOP", Theme.bad]
             if (inControl)
                 return ["BRIDGE IN CONTROL // " + bridge.bridgeState, bridge.bridgeMessage, Theme.control]
             if (hdr.shieldsDown)
                 return ["SHIELDS OFFLINE", hdr.flightAlert ? bridge.alertDetail : "SHIELDS DOWN", Theme.bad]
             if (hdr.flightAlert)
                 return [bridge.alertDetail, bridge.alertValue + " ACTIVE ALERT" + (bridge.alertValue === "1" ? "" : "S"), bridge.alertLevel === "bad" ? Theme.bad : Theme.info]
-            if (bridge.updateAvailable && String(bridge.bridgeState || "IDLE") === "IDLE")
-                return ["UPDATE AVAILABLE // " + bridge.updateLatestVersion, "SEE SETUP > STATUS", Theme.info]
+            // last 10 s before arrival and 10 s after: show it over everything except the warnings above
+            if (hdr.arrivingDelivery !== null)
+                return hdr.deliveryLines(hdr.arrivingDelivery)
             if (bridge.eliteTelemetryState === "MENU")
                 return ["ELITE AT MAIN MENU", "LOAD IN // THE BRIDGE PICKS UP YOUR SHIP", Theme.info]
             if (bridge.eliteTelemetryState !== "CONNECTED")
@@ -276,6 +320,8 @@ Item {
             if (st === "IDLE" || st === "") {
                 if (hdr.setupProblems.length)
                     return ["SETUP NEEDS ATTENTION", hdr.setupProblems[0] + (hdr.setupProblems.length > 1 ? "  +" + (hdr.setupProblems.length - 1) + " MORE // SEE MASTER CAUTION" : ""), Theme.info]
+                if (hdr.headerDelivery !== null)
+                    return hdr.deliveryLines(hdr.headerDelivery)
                 return ["ALL SYSTEMS NOMINAL", "NO ACTIVE ALERTS", Theme.ok]
             }
             return [st, bridge.bridgeMessage, bridge.bridgeLevel === "bad" ? Theme.bad : (bridge.bridgeLevel === "warn" ? Theme.info : Theme.ok)]

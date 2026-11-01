@@ -21,6 +21,8 @@ Item {
         ["NAVIGATION", "ROUTE COMPUTER", 1],
         ["COLONIZATION", "SYSTEM DEVELOPMENT", 4],
         ["COMMANDER", "RECORDS + CARGO", 5],
+        ["MINING", "RINGS + HAUL", 13],
+        ["ENGINEERING", "MODULES + MATERIALS", 14],
         ["SETUP", "SYSTEM SETTINGS", 8]
     ]
     // "?" beside a module: go to that page (if needed) and play its spoken walkthrough
@@ -58,7 +60,7 @@ Item {
             // is amber until that page's tour has been watched once.
             Item {
                 id: row
-                width: buttons.width; height: Math.max(40, 74 * col.s)
+                width: buttons.width; height: Math.max(38, 68 * col.s)      // 9 modules (2026-10-28)
                 readonly property real tourW: 58 * col.s
                 readonly property int page: modelData[2]
                 // Flight Deck plays its own tour (help page 12); Setup plays the tab you're on

@@ -163,6 +163,8 @@ Window {
 
     function uiPageName(page) {
         if (page === 5) return "COMMANDER"
+        if (page === 13) return "MINING"
+        if (page === 14) return "ENGINEERING"
         if (page === 6) return "SETUP > VOICE & AI"
         if (page === 7) return "SETUP > SOUND"
         if (page === 8) return "SETUP > STATUS"
@@ -435,7 +437,14 @@ Window {
         if (page === 0) {
             if (step === 0) return nav.guideTarget
             var moduleIndex = step - 1
-            return (moduleIndex >= 0 && moduleIndex < nav.moduleRepeater.count) ? nav.moduleRepeater.itemAt(moduleIndex) : nav.guideTarget
+            // match by page, so modules without a tour step (MINING) don't shift the highlights
+            if (moduleIndex >= 0 && moduleIndex < firstOrientationPages.length) {
+                for (var i = 0; i < nav.moduleRepeater.count; i++) {
+                    var it = nav.moduleRepeater.itemAt(i)
+                    if (it && it.page === firstOrientationPages[moduleIndex]) return it
+                }
+            }
+            return nav.guideTarget
         }
         if (page === 1) return step === 0 ? navigationPage.routeTarget : (step === 1 ? navigationPage.destinationTarget : navigationPage.deckTarget)
         if (page === 2) return step === 0 ? combatPage.deckTarget : (step === 1 ? combatPage.viewTarget : combatPage.infoTarget)
@@ -448,6 +457,8 @@ Window {
         if (page === 8) return step === 0 ? setupStatusPage.checkTarget : (step === 1 ? setupStatusPage.sideTarget : setupStatusPage.deckTarget)
         if (page === 11) return step === 0 ? setupAutomationPage.dockTarget : (step === 1 ? setupAutomationPage.combatTarget : (step === 2 ? setupAutomationPage.aiTarget : setupAutomationPage.deckTarget))
         if (page === 9) return step === 0 ? setupDisplayPage.windowTarget : (step === 1 ? setupDisplayPage.fxTarget : (step === 2 ? setupDisplayPage.overlayTarget : setupDisplayPage.deckTarget))
+        if (page === 14) return [engineeringPage.modulesTarget, engineeringPage.engineersTarget, engineeringPage.matsTarget][Math.max(0, Math.min(2, step))]
+        if (page === 13) return [miningPage.rockTarget, miningPage.tilesTarget, miningPage.haulTarget, miningPage.sellTarget, miningPage.ringsTarget, miningPage.rhinoTarget, miningPage.deckTarget][Math.max(0, Math.min(6, step))]
         if (page === 10) return step === 0 ? setupControlsPage.pttTarget : (step === 1 ? setupControlsPage.commandsTarget : (step === 2 ? setupControlsPage.eliteTarget : setupControlsPage.deckTarget))
         return null
     }
@@ -811,6 +822,7 @@ Window {
         noticeDetail: root.deckNoticeDetail
         noticeLevel: root.deckNoticeLevel
         onUpdatePressed: root.currentPage = 8
+        onDeliveriesPressed: { root.currentPage = 5; commanderPage.showDeliveries() }
         onMasterCautionPressed: {
             // Setup problems are listed on SETUP > SYSTEM. Flight alerts are already on the header screen.
             if (header.setupProblems.length > 0 && !header.shieldsDown && !header.flightAlert) {
@@ -845,6 +857,7 @@ Window {
         width: identity.width; height: root.height-y-root.m
         app: root
         onDenied: (title, reason) => root.showDeckNotice(title, reason)
+        onOpenDeliveries: { root.currentPage = 5; commanderPage.showDeliveries() }
     }
 
     // NAVIGATION (page 1): route computer, flight plan, set destination, in-system target, route log.
@@ -902,6 +915,30 @@ Window {
         onNotice: (title, detail, level) => root.showDeckNotice(title, detail, level)
     }
 
+
+    // MINING (page 13): prospector verdicts, this run, hold + kit, where to sell, rings. Surface later.
+    Mining {
+        id: miningPage
+        objectName: "miningPage"
+        visible: root.currentPage === 13
+        x: identity.x; y: identity.y+identity.height+root.gap
+        width: identity.width; height: root.height-y-root.m
+        app: root
+        onDenied: (title, reason) => root.showDeckNotice(title, reason)
+        onNotice: (title, detail, level) => root.showDeckNotice(title, detail, level)
+    }
+
+    // ENGINEERING (page 14), 2026-10-28
+    Engineering {
+        id: engineeringPage
+        objectName: "engineeringPage"
+        visible: root.currentPage === 14
+        x: identity.x; y: identity.y+identity.height+root.gap
+        width: identity.width; height: root.height-y-root.m
+        app: root
+        onDenied: (title, reason) => root.showDeckNotice(title, reason)
+        onNotice: (title, detail, level) => root.showDeckNotice(title, detail, level)
+    }
 
     // COMMANDER (page 5): ranks, ship, career, session, cargo hold.
     Commander {
@@ -1035,7 +1072,7 @@ Window {
                     activity: bridge.bridgeActivity
                     title: bridge.bridgeActivityTitle
                     detail: bridge.bridgeActivityDetail
-                    rows: bridge.aiCommsRows
+                    rows: bridge.overlayRows
                 }
             }
         }
@@ -1168,7 +1205,7 @@ Window {
         color:"#300908"; border.color:root.red; border.width:Math.max(2,4*root.scaleUnit)
         opacity:.97
         SequentialAnimation on opacity {
-            running:parent.visible; loops:Animation.Infinite
+            running:orientationLockNotice.visible; loops:Animation.Infinite
             NumberAnimation { to:.78; duration:360; easing.type:Easing.InOutQuad }
             NumberAnimation { to:.97; duration:360; easing.type:Easing.InOutQuad }
         }
@@ -1261,7 +1298,7 @@ Window {
                 }
             }
             SequentialAnimation on opacity {
-                running:parent.visible; loops:Animation.Infinite
+                running:tutorialIntroArrow.visible; loops:Animation.Infinite
                 NumberAnimation { to:.58; duration:430; easing.type:Easing.InOutQuad }
                 NumberAnimation { to:1.0; duration:430; easing.type:Easing.InOutQuad }
             }
@@ -1340,4 +1377,22 @@ Window {
         }
     }
 
+
+    // 2026-10-25: Emergency Escape is a big deal on the Bridge window too: a red frame pulses
+    // round the whole window while it runs (the header and CANCEL already turn red).
+    Rectangle {
+        id: egressFrame
+        anchors.fill: parent
+        z: 9000
+        visible: bridge.bridgeActivity === "CRITICAL" && bridge.bridgeActivityTitle === "EMERGENCY ESCAPE"
+        color: "transparent"
+        border.color: Theme.bad; border.width: 8
+        property real pulse: 0
+        opacity: 0.4 + 0.6 * pulse
+        SequentialAnimation on pulse {
+            loops: Animation.Infinite; running: egressFrame.visible
+            NumberAnimation { from: 0; to: 1; duration: 450; easing.type: Easing.OutQuad }
+            NumberAnimation { from: 1; to: 0; duration: 650; easing.type: Easing.InQuad }
+        }
+    }
 }

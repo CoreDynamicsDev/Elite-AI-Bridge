@@ -114,13 +114,25 @@ Item {
     Section {
         id: launchPlate
         x: 0; y: dockPlate.height + au.g; width: au.colW; height: au.bodyH - y
-        title: "AFTER YOU LAUNCH // THIS SESSION ONLY"
-        blurb: "Turns itself off when you close the Bridge."
+        title: "STARTUP, LAUNCH + POWERPLAY"
+        blurb: "Clear + Jump after launch turns itself off when you close the Bridge."
+        SettingRow {
+            name: "SESSION DEBRIEF AT STARTUP"
+            line: "The ship voice sums up your last game session once when the Bridge starts. The full debrief is on Commander > DEBRIEF."
+            on: bridge.setupDebriefOnStart
+            onFlipped: (v) => bridge.setSetupBool("debrief_on_start", v)
+        }
         SettingRow {
             name: "CLEAR + JUMP AFTER LAUNCH"
             line: "When Auto Launch has cleared the station, the Bridge carries on and jumps to your plotted route."
             on: bridge.aiLaunchRuleEnabled
             onFlipped: (v) => { if (v !== bridge.aiLaunchRuleEnabled) bridge.requestCommand("ai_toggle_launch_rule") }
+        }
+        SettingRow {
+            name: "POWERPLAY CALLOUTS"
+            line: "Merit callouts, and the AI commenting when a sale earns no merits. Leave off unless you play Powerplay."
+            on: bridge.setupPowerplayCallouts
+            onFlipped: (v) => bridge.setSetupBool("powerplay_callouts", v)
         }
     }
 

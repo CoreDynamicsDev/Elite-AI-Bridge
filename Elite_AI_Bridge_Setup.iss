@@ -1,5 +1,5 @@
 #define MyAppName "Elite AI Bridge"
-#define MyAppVersion "2.0.4"
+#define MyAppVersion "2.0.5"
 #define MyAppPublisher "Elite AI Bridge"
 #define MyAppURL "https://ko-fi.com/eliteaibridge"
 ; 2.0.0: shortcuts run the runtime's own pythonw.exe (signed by the Python Software Foundation)
@@ -22,7 +22,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=Output
-OutputBaseFilename=Elite_AI_Bridge_Setup_2.0.4
+OutputBaseFilename=Elite_AI_Bridge_Setup_2.0.5
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -42,7 +42,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 ; The tested 2.0.0 payload is installed intact. The .venv is created after file copy.
-Source: "Elite AI Bridge\*"; DestDir: "{app}"; Excludes: "__pycache__,*.pyc,Launch_Elite_AI_Bridge.vbs,Elite AI Bridge.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Elite AI Bridge\*"; DestDir: "{app}"; Excludes: "__pycache__,*.pyc,Launch_Elite_AI_Bridge.vbs,Elite AI Bridge.exe,main-1.py,Camera.qml,asteroid_atlas.png"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
@@ -50,10 +50,13 @@ Name: "{localappdata}\EliteAIBridge"
 
 [Icons]
 ; AppUserModelID matches main.py so a pinned shortcut and the running Bridge share one taskbar button.
-Name: "{autoprograms}\Elite AI Bridge"; Filename: "{#RuntimePythonW}"; Parameters: """{app}\frontend\main.py"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\Elite_AI_Bridge.ico"; AppUserModelID: "CoreDynamicsDev.EliteAIBridge"
+Name: "{autoprograms}\Elite AI Bridge"; Filename: "{app}\START_HERE.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\Elite_AI_Bridge.ico"; Flags: runminimized; AppUserModelID: "CoreDynamicsDev.EliteAIBridge"; Comment: "Starts Elite AI Bridge (repairs the runtime first if it is missing)"
+; 2.0.5: the shortcuts run START_HERE.bat (minimized): it checks the runtime is there and starts the Bridge,
+; or opens the repair window if it is missing. Repair runs the full check and rebuild, then starts the Bridge.
+Name: "{autoprograms}\Repair Elite AI Bridge"; Filename: "{app}\START_HERE.bat"; Parameters: "repair"; WorkingDir: "{app}"; IconFilename: "{app}\assets\Elite_AI_Bridge.ico"; Comment: "Rebuilds the Bridge runtime if it is missing or broken, then starts the Bridge"
 Name: "{autoprograms}\Elite AI Bridge Documentation"; Filename: "{app}\docs\README.md"; WorkingDir: "{app}\docs"
 Name: "{autoprograms}\Privacy and API Keys"; Filename: "{app}\docs\PRIVACY_AND_API_KEYS.md"; WorkingDir: "{app}\docs"
-Name: "{autodesktop}\Elite AI Bridge"; Filename: "{#RuntimePythonW}"; Parameters: """{app}\frontend\main.py"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\Elite_AI_Bridge.ico"; AppUserModelID: "CoreDynamicsDev.EliteAIBridge"; Tasks: desktopicon
+Name: "{autodesktop}\Elite AI Bridge"; Filename: "{app}\START_HERE.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\Elite_AI_Bridge.ico"; Flags: runminimized; AppUserModelID: "CoreDynamicsDev.EliteAIBridge"; Comment: "Starts Elite AI Bridge (repairs the runtime first if it is missing)"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checkedonce

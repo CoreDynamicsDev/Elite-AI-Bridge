@@ -34,16 +34,30 @@ function Status([string]$Text) {
     try { Set-Content -Path $StatusFile -Value $Text -Encoding ASCII } catch {}
 }
 
+# 2026-10-26: skip the Microsoft Store Python. It keeps its files partly sandboxed and Qt
+# then can't load its QML plugin (qtquick2plugin.dll "specified module could not be found"),
+# so the window never opens. With only the Store copy present, setup installs python.org 3.12.
+$PyCheck = "import sys; assert sys.version_info >= (3,12); assert 'windowsapps' not in (sys.base_prefix + sys.executable).lower()"
+
 function Find-Python {
     try {
-        & py -3.12 -c "import sys; assert sys.version_info >= (3,12)" 2>$null
+        & py -3.12 -c $PyCheck 2>$null
         if ($LASTEXITCODE -eq 0) { return @("py","-3.12") }
     } catch {}
     try {
-        & python -c "import sys; assert sys.version_info >= (3,12)" 2>$null
+        & python -c $PyCheck 2>$null
         if ($LASTEXITCODE -eq 0) { return @("python","") }
     } catch {}
     return $null
+}
+
+# True when an existing runtime was built on the Store Python (its pyvenv.cfg points into WindowsApps).
+function Runtime-On-StorePython {
+    try {
+        $cfg = Join-Path $VenvRoot "pyvenv.cfg"
+        if (-not (Test-Path $cfg)) { return $false }
+        return [bool](Select-String -Path $cfg -Pattern "WindowsApps" -SimpleMatch -Quiet)
+    } catch { return $false }
 }
 
 function Folder-MB([string]$Path) {
@@ -108,6 +122,10 @@ try {
         Log "Incomplete runtime from an earlier attempt detected. Rebuilding it cleanly..."
         Remove-Item -Recurse -Force $RuntimeRoot
     }
+    elseif (Runtime-On-StorePython) {
+        Log "The runtime was built on the Microsoft Store Python, which can't load the Bridge window. Rebuilding it on python.org Python..."
+        Remove-Item -Recurse -Force $RuntimeRoot
+    }
     New-Item -ItemType Directory -Force -Path $RuntimeRoot | Out-Null
 
     Status "Step 1 of 4: Looking for Python..."
@@ -115,7 +133,7 @@ try {
     if (-not $Python) {
         $winget = Get-Command winget -ErrorAction SilentlyContinue
         if (-not $winget) { throw "Python 3.12+ is required and Windows Package Manager is unavailable." }
-        Log "Python 3.12 was not found. Installing it with winget..."
+        Log "Python 3.12 (python.org, not the Microsoft Store copy) was not found. Installing it with winget..."
         Status "Step 1 of 4: Installing Python 3.12 (about 30 MB)..."
         & winget install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements --silent
         if ($LASTEXITCODE -ne 0) { throw "Python installation failed." }
