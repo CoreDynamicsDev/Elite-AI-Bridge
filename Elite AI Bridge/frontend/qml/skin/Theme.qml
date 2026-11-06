@@ -3,6 +3,7 @@
 // red = stop / danger, dim = off or unknown, white = Bridge in control.
 pragma Singleton
 import QtQuick
+import "holidays/Packs.js" as Packs
 
 QtObject {
     id: theme
@@ -21,11 +22,38 @@ QtObject {
     // meaning (green = good, red = danger) and heads-up amber turns yellow so it still stands
     // out against amber text. Hardware (keys, lamps, plates, LED clock) never changes.
     readonly property string screenTheme: _hasBridge && bridge.screenTheme !== undefined ? String(bridge.screenTheme) : "GREEN"
-    readonly property bool amber: screenTheme === "AMBER"
 
-    // t(c): the screen version of a colour. Green-family colours become amber, amber heads-up
-    // colours become yellow; anything else (red, white, greys) comes back unchanged. Works on
-    // "#RRGGBB", "#AARRGGBB" or a color. Bindings that call it update when the theme changes.
+    // ---------------------------------------------------------------- holidays (LAB 2026-11-05)
+    // Setup > Display > HOLIDAYS: AUTO (by date), OFF, or one pack picked by name. A pack
+    // (holidays/Packs.js) may set its own screen colour while it's on; HolidayDecor.qml draws
+    // the decorations. Rechecked every 10 minutes so AUTO turns over at midnight by itself.
+    readonly property string holidayMode: _hasBridge && bridge.holidayMode !== undefined ? String(bridge.holidayMode) : "AUTO"
+    property date _today: new Date()
+    readonly property Timer _dayTimer: Timer { interval: 600000; running: true; repeat: true; onTriggered: theme._today = new Date() }
+    readonly property string holiday: Packs.active(holidayMode, _today)
+    readonly property string holidayScreen: holiday !== "" ? String(Packs.PACKS[holiday].screen || "") : ""
+    // the colour the screens actually use
+    readonly property string screenPalette: holidayScreen !== "" ? holidayScreen : screenTheme
+    readonly property bool amber: screenPalette !== "GREEN"
+    // green phosphor -> palette: [full colour factors], [pale colour factors] (times brightness)
+    readonly property var _pal: ({ AMBER:   [[1, 0.69, 0.157], [1, 0.957, 0.878]],
+                                   COPPER:  [[1, 0.50, 0.20], [1, 0.84, 0.72]],
+                                   PURPLE:  [[0.74, 0.46, 1], [0.93, 0.87, 1]],
+                                   ROSE:    [[1, 0.42, 0.80], [1, 0.88, 0.95]],
+                                   JADE:    [[0.25, 1, 0.80], [0.85, 1, 0.95]],
+                                   EMERALD: [[0.15, 1, 0.42], [0.82, 1, 0.86]],
+                                   SKY:     [[0.50, 0.80, 1], [0.90, 0.96, 1]],
+                                   GOLD:    [[1, 0.84, 0.30], [1, 0.97, 0.86]],
+                                   ICE:     [[0.62, 0.94, 1], [0.92, 0.99, 1]] })
+    // Setup > Display > THEME list. Holidays use the same colours (holidays/Packs.js screen).
+    // No red screen (red means danger) and no white one (white means the Bridge is flying).
+    readonly property var themeMenu: [["GREEN", "GREEN"], ["AMBER", "OLD SCHOOL AMBER"], ["COPPER", "COPPER"],
+                                      ["GOLD", "GOLD"], ["EMERALD", "EMERALD"], ["JADE", "JADE"], ["SKY", "SKY BLUE"],
+                                      ["ICE", "ICE BLUE"], ["PURPLE", "PURPLE"], ["ROSE", "ROSE"]]
+    // CRT shader tint per palette
+    readonly property vector4d crtPhos: _pal[screenPalette] ? Qt.vector4d(_pal[screenPalette][0][0], _pal[screenPalette][0][1], _pal[screenPalette][0][2], 1.0)
+                                                            : Qt.vector4d(0.45, 1.0, 0.55, 1.0)
+
     function t(c) {
         if (!amber) return c
         var r, g, b, a = 1.0
@@ -40,10 +68,12 @@ QtObject {
         if (g >= r && g >= b && g > mn) {
             // green family -> amber phosphor, same brightness; paler greens stay a little paler
             var k = Math.min(1.0, 0.35 + 1.3 * (mx - mn) / mx)
-            return Qt.rgba(mx, mx * (0.957 * (1 - k) + 0.69 * k), mx * (0.878 * (1 - k) + 0.157 * k), a)
+            var P = _pal[screenPalette] || _pal.AMBER, F = P[0], L = P[1]
+            return Qt.rgba(mx * (L[0] * (1 - k) + F[0] * k), mx * (L[1] * (1 - k) + F[1] * k), mx * (L[2] * (1 - k) + F[2] * k), a)
         }
         if (r >= g && g >= b && g / r >= 0.55 && g / r <= 0.9 && b / r < 0.45) {
-            // amber heads-up -> yellow
+            // amber heads-up -> yellow (on a GOLD screen yellow would vanish, so cyan there)
+            if (screenPalette === "GOLD") return Qt.rgba(mx * 0.35, mx * 0.85, mx, a)
             return Qt.rgba(mx, mx * 0.95, mx * 0.42, a)
         }
         return c

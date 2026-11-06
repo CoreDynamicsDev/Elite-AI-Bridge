@@ -414,7 +414,7 @@ Item {
                         width: 600 * wz.s; height: 300 * wz.s
                         color: "#020306"; border.color: "#3a3c36"; border.width: 2; clip: true
                         Canvas {
-                            property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                            property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                             onThemeAmberChanged: requestPaint()
                             anchors.fill: parent
                             onPaint: {

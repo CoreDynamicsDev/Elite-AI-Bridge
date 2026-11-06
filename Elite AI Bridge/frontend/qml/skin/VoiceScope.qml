@@ -22,7 +22,7 @@ Item {
     Rectangle { anchors.fill: parent; anchors.margins: sc.rim; radius: width / 2; border.color: "#000"; border.width: 1
         gradient: Gradient { GradientStop { position: 0; color: Theme.glassTop } GradientStop { position: 1; color: Theme.glassEdge } } }
     Canvas {
-        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+        property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
         onThemeAmberChanged: requestPaint()
         id: trace
         anchors.fill: parent; anchors.margins: sc.rim + 2

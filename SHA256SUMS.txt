@@ -1,5 +1,5 @@
 8768d7f3caf811233e9530effecaab32ec5b41bcf7200d5e3bd1261e9fd77fd1  ./branding/Elite_AI_Bridge.ico
-b46cd02ae74bf03891abaa76390e7686a14d2ec6c4339e4304acd5a9acdf79cb  ./BUILD_INSTALLER.bat
+3ce2a931705e03032247aa259cfebec88e53372ef069d28e831bf3e1a14c4a4c  ./BUILD_INSTALLER.bat
 4f19629a44401d510c04e624fcee0d966f01f17e4b1f0dedf1641aa668ef7747  ./DISCLAIMER.md
 8768d7f3caf811233e9530effecaab32ec5b41bcf7200d5e3bd1261e9fd77fd1  ./Elite AI Bridge/assets/Elite_AI_Bridge.ico
 c174b1101c7f602f43377a6e5fc1ed010c96bb557c34a0450571aa71b8f84117  ./Elite AI Bridge/backend/Assets/hero_console_shell.png
@@ -8,7 +8,7 @@ af9b6012869d34bb9c21d84f846c09506962b7387188d84fce0b3a05b9d7e17e  ./Elite AI Bri
 9abce3b1436d46a0cb2cd02bbbdc5d97e5c2d0e1fdb884c8c84e93bfaee67c17  ./Elite AI Bridge/backend/Assets/hero_console_shell_2560.png
 b522e1593b56a42ae661c1a121c99db7c762828912ececd2131f0154ac33f092  ./Elite AI Bridge/backend/Assets/hero_console_shell_3840.png
 a2c1bbf2fc3b461c7a3ca92a61f6780ca6d778835be7c039d5d2bb9fa93994c5  ./Elite AI Bridge/backend/Assets/hero_console_shell_5120.png
-a378edd7b60afcf44ac0d52ab4775c0dcf1de391b3f7f0f29bacca504092e3ad  ./Elite AI Bridge/backend/backend_host.py
+64ca7a76d16c685eb761403f3ac3cae4f81764c713b951745e48b53ca5a2b160  ./Elite AI Bridge/backend/backend_host.py
 fc536aea605fe7c24fc7d2b52a4e81f52ef7810ee6f0192ae63b64212c505f2a  ./Elite AI Bridge/backend/EliteAIBridge_v0_12_95.py
 5fb549dd1b33f6d95dcf1265c1e63de05a57881704db4173774e972d360a2d37  ./Elite AI Bridge/backend/README.txt
 e5df730e2225123cf266afff0c7769b8e8fd12a1ef8303f3f5f8783f7c6d5f05  ./Elite AI Bridge/backend/requirements.txt
@@ -34,7 +34,7 @@ a3728af341617ea253428758f1e228d00bc782159e6395b4c4b3772b04faf3b6  ./Elite AI Bri
 b32e41b6408b555f6a0c98409f0a3590c205c975bc2ae0435aaeae6f285da8d3  ./Elite AI Bridge/docs/THIRD_PARTY_NOTICES.md
 c08c9c25971f57e8825f0b9fa007e28874c7fed74de26b94dd779051b08aa306  ./Elite AI Bridge/frontend/assets/make_asteroid.py
 de2f74fe82b6a317ef3669b43ceb4b13efdc3cf15dd8b9337621aa59c576c69a  ./Elite AI Bridge/frontend/boot_splash.py
-f501be0e4fb4087c6cc7976b4d243a9cd62106a82c43a216724b0961e715f32c  ./Elite AI Bridge/frontend/main.py
+a921768d55a2154442175b1c1c6b2228fd30a1939dd57bbdac183703e3f709ad  ./Elite AI Bridge/frontend/main.py
 3359a072527ca1a335c7f0b28f5eb32c7ac1af7f152cce2077aaac9922869c7f  ./Elite AI Bridge/frontend/qml/assets/ship_art/ship_cat_large_combat.png
 0ec6f86592a474b9541a8434b2e509d4226df80e232191d0c50038e9ad64daef  ./Elite AI Bridge/frontend/qml/assets/ship_art/ship_cat_large_freighter_hauler.png
 661d06959c8acf67eaafa030b433750c39301662654faa0fc69e244bc86d59c1  ./Elite AI Bridge/frontend/qml/assets/ship_art/ship_cat_large_passenger_luxury_liner.png
@@ -43,31 +43,31 @@ f501be0e4fb4087c6cc7976b4d243a9cd62106a82c43a216724b0961e715f32c  ./Elite AI Bri
 e9ef529a85dabba3017930fec6663257f0a01e7b39cccc8be812a69f1929a92f  ./Elite AI Bridge/frontend/qml/assets/ship_art/ship_cat_medium_combat.png
 808a34a345ae3dbbdf9e43a0a839b0715739dd77518ecabba8b92a8c5f479d59  ./Elite AI Bridge/frontend/qml/assets/ship_art/ship_cat_medium_freighter.png
 7f8168865641d18fd4444b0a169e58ce61e70aa933fef3d728302d0a8644d369  ./Elite AI Bridge/frontend/qml/assets/ship_art/ship_cat_medium_multirole.png
-dd58b6c67c49388bcf126a0a240efe9c82ae828c63be78a55485f28347eb2307  ./Elite AI Bridge/frontend/qml/Main.qml
-5f4ba2284000eddaef9cdb8331c7c25cc49fca7ad8bf4a5083f7496f85a54eb0  ./Elite AI Bridge/frontend/qml/pages/Colonization.qml
-eb9b06f25eb25634bf56e9736eb109c8da6d6fb71393baf43ef92db063df9125  ./Elite AI Bridge/frontend/qml/pages/Combat.qml
-67284ac31aa4e86a0bb240dc5a61a26744d219856bb648313abef1f3a66f90ff  ./Elite AI Bridge/frontend/qml/pages/Commander.qml
+abb68ffacbb5466eac100b57df0636abdaebc2a9e6161713d3c6faab4c68fc72  ./Elite AI Bridge/frontend/qml/Main.qml
+bd076f79851da9fb4171179a99d997355e99cfc8e99a223b1615804edc38b779  ./Elite AI Bridge/frontend/qml/pages/Colonization.qml
+25f464dc2456945f5c5c83ecbe2b07a53c733e921f0bd6e3d06047907625608e  ./Elite AI Bridge/frontend/qml/pages/Combat.qml
+1809b6557972256768784ffd98fc925306924c54ea21e2178f76f4bf4820fa3a  ./Elite AI Bridge/frontend/qml/pages/Commander.qml
 f5e11bad97e84db7d5180da2178c690a5709e1bb94dda23f45efaa5598d745ca  ./Elite AI Bridge/frontend/qml/pages/Engineering.qml
-377ec042e46d49b4b4103a697ccb4df7dc931c5bab263ed066ca5937bd72c9a2  ./Elite AI Bridge/frontend/qml/pages/FlightDeck.qml
+7dd5c2c763c963b51e724d4fb41954978de30c693d8664f48cd092cddb59215c  ./Elite AI Bridge/frontend/qml/pages/FlightDeck.qml
 e3728384b2c53783281d55944186e725f5d9b483161ee8da8d12b62cf26ee88a  ./Elite AI Bridge/frontend/qml/pages/Mining.qml
-ce54d4e2b75649d4513e912600a6d7817ed9797472b0671821d374f4f653c006  ./Elite AI Bridge/frontend/qml/pages/Navigation.qml
+be9fd8022c0a35850182e89206f326375c52cfb2a44b4499c7b2bb6d2e392511  ./Elite AI Bridge/frontend/qml/pages/Navigation.qml
 12e18f655b70f6f2448dcad0b2f6ba95cd7fdc703838d7fc702d258565bf4f06  ./Elite AI Bridge/frontend/qml/pages/SetupAutomation.qml
 8b7b709b89babc8bd67a85f00bfb14a5732805a11fa0c72bfb11464db96b11bf  ./Elite AI Bridge/frontend/qml/pages/SetupControls.qml
-70a83a5a745c90c586d10b0ef06e42defec03f308e0110db1489572b0dcaea75  ./Elite AI Bridge/frontend/qml/pages/SetupDisplay.qml
+3c70e7e6f0db5e932c54baa4d4ee334d9adf70c48350ae77fc91be493068fee7  ./Elite AI Bridge/frontend/qml/pages/SetupDisplay.qml
 1c0aa2b6b47e08a4582fb28d8bbb9d45edf4be64ddd0165de57180fa08d1a736  ./Elite AI Bridge/frontend/qml/pages/SetupSound.qml
 368720d1feb569d9999c470e86be890ef2551c76edccea8084b80423c0f141d2  ./Elite AI Bridge/frontend/qml/pages/SetupStatus.qml
 060c581503624bd657e61c7c3d9f698286da743fb9ed27196c4a7ba804728fc2  ./Elite AI Bridge/frontend/qml/pages/SetupVoiceAi.qml
-36e8f0323c9db423e52330fc5ed7971573228ea64e8ad6b734578fc1deef66bb  ./Elite AI Bridge/frontend/qml/pages/Trade.qml
-3577be78782ba2b9c943d6e2a10f76f8115790da2735dc3867222bdd696ea444  ./Elite AI Bridge/frontend/qml/shell/ChassisHeader.qml
+3a551d9d75d106ba9d20d462b73719e6402f7d9d03a4957a9ab904f1f9f0524b  ./Elite AI Bridge/frontend/qml/pages/Trade.qml
+bba6a81f4e2a77d9241e5ed52de693ac49f71b172303745c516b8f977c8f2012  ./Elite AI Bridge/frontend/qml/shell/ChassisHeader.qml
 57b617c832c13c7a487e58bb07cae7c305abb0e42cde2c7a3e290f7c27cc7982  ./Elite AI Bridge/frontend/qml/shell/IdentityStrip.qml
 914b67b97f69f522af039fa17e8366cc59c812b0553982aaae2a0264eeb94295  ./Elite AI Bridge/frontend/qml/shell/ModuleColumn.qml
-9207c64af278a84f0703cb2b4eab8c8981a2142cd3f270575d7c56337d3b8f9e  ./Elite AI Bridge/frontend/qml/shell/SetupWizard.qml
+d0319a62c90a20daa8ca55f0a82ca2a4ebd93b295aaac838ba5587b3489c26fc  ./Elite AI Bridge/frontend/qml/shell/SetupWizard.qml
 c3f058ce806d518d194b275977d5663aa6efb277a720b873bbbf8f22a89bfcb4  ./Elite AI Bridge/frontend/qml/skin/Annunciator.qml
 77f26c3239b18afed3d1cc0b4f6ca731e16895886ffefe9754e1713ae08509d5  ./Elite AI Bridge/frontend/qml/skin/Asteroid.qml
 54b048a4d465e82e52d224877e94dca81d16728bb88b475eb758dcd43b9df095  ./Elite AI Bridge/frontend/qml/skin/Bezel.qml
 8904659604fb33dd6c715fb0feeebdecd7cb580807da07be90389885f7619fe2  ./Elite AI Bridge/frontend/qml/skin/BlockBar.qml
-e48cd4f0658bca38ba7fdf484f15ab340ca7e464d0fbc2b365fddbd6930012f3  ./Elite AI Bridge/frontend/qml/skin/ContactScanner.qml
-e968ba6348b8bb1202810f15158ddf1ae2a69a6c8a541f6a5e1dd9c166f6def5  ./Elite AI Bridge/frontend/qml/skin/CrtScreen.qml
+cd733db09250dc0bda2e95338c583316b81a1075e24b104e43b33da9129acbfe  ./Elite AI Bridge/frontend/qml/skin/ContactScanner.qml
+13d9d628471f002779e3ceea8ec91560250ac58237ab14b4d1b852337d289032  ./Elite AI Bridge/frontend/qml/skin/CrtScreen.qml
 6ac39a55c614a97508c0477279266c99650634e552be5d84f4dc62b031706872  ./Elite AI Bridge/frontend/qml/skin/DeckKey.qml
 d6f1f1843a587f752f81042f3431ffefce43a48570a422ecab40a7ab91b66fcc  ./Elite AI Bridge/frontend/qml/skin/Dymo.qml
 d16181c4eeae29e695ca547ee9be437d01d4909ac1f8f349f04176dc6858873b  ./Elite AI Bridge/frontend/qml/skin/fonts/DSEG7Classic-Bold.ttf
@@ -80,11 +80,76 @@ cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d  ./Elite AI Bri
 6c2973341873a7c5aa249bcae2ce0b4b81b71be832f154a007d8819dcc227170  ./Elite AI Bridge/frontend/qml/skin/Glow.qml
 b341c393f35f7ed3256e5be857bbdfb541851c6c4fb8b244fd09ebd450b18143  ./Elite AI Bridge/frontend/qml/skin/HazardStripes.qml
 968c5d75d4acf6d042bad90c65106e5f4b269263ee8e1b89339e6beef93922c6  ./Elite AI Bridge/frontend/qml/skin/HoldView.qml
+b3681fcfc09862065d65f9757fa9361ab51170a731114bf80a5328d14c2b13e4  ./Elite AI Bridge/frontend/qml/skin/HolidayDecor.qml
+2da923f12c102b1cfced70ed95f75785513ad57ddaa081f974972032c50c5e00  ./Elite AI Bridge/frontend/qml/skin/holidays/art/acorn.svg
+30215d9065d0b3a09e54c39ab1da962c21c4223a98cb316e9fc68df55d125591  ./Elite AI Bridge/frontend/qml/skin/holidays/art/bat.svg
+c090ed5173da0e812ad198bcc354fa7b447b03622302a32eb3ab2f773095017c  ./Elite AI Bridge/frontend/qml/skin/holidays/art/blossom_pink.svg
+652d75b850247e6966c54a7dc319e67599119f937407f6e20752774d73912854  ./Elite AI Bridge/frontend/qml/skin/holidays/art/blossom_white.svg
+690414c2e2bc48040256682899a4e71253e39b0a6bc96bbd4e8d2f20daad6cd5  ./Elite AI Bridge/frontend/qml/skin/holidays/art/bulb_blue.svg
+0e37c732b528a2a8c649dc6331105f4aaccea39203bd0c77bee08dc17c9f4eee  ./Elite AI Bridge/frontend/qml/skin/holidays/art/bulb_gold.svg
+5a27fb9401990e2d3b29a2482e8c9e588b30fdac7ede8cf6807425045910c803  ./Elite AI Bridge/frontend/qml/skin/holidays/art/bulb_green.svg
+9b51867c036fc88a45328205fa0d8201f2163c6de09f9aed3ebf2120d0407388  ./Elite AI Bridge/frontend/qml/skin/holidays/art/bulb_red.svg
+c1f74a33e7c07f4454c5ce59bb6ee8b320f1fcbd67e1ceb35640b2a88ae5ac23  ./Elite AI Bridge/frontend/qml/skin/holidays/art/bulb_white.svg
+0be1b2418399f8c61cab41bbbe40030929e4be6a64edfbf62d742c5af1486310  ./Elite AI Bridge/frontend/qml/skin/holidays/art/candy_corn.svg
+df9ba88e0170698e0cf4d6f432f72f114cbd94b6e853eb6b30c6906981ed9b26  ./Elite AI Bridge/frontend/qml/skin/holidays/art/canister_a.svg
+2c7cdc1391025634f9206257e94b61f4f4fd0c9b880888f3e3b8af95327ea8b5  ./Elite AI Bridge/frontend/qml/skin/holidays/art/canister_b.svg
+e7debee279034c61969f687486b397814d7e7004aa855c52cdfc3b1c5f1b58b5  ./Elite AI Bridge/frontend/qml/skin/holidays/art/chick.svg
+3f8c1681709e9ca4e74f17e33a6c8578b9ed0bb28b1e1af2b7bdf6f6e9dcacc4  ./Elite AI Bridge/frontend/qml/skin/holidays/art/confetti_blue.svg
+340f98d1a7dbe1d14434cb066176cd64fbb480031cd9e11555b805b644492f0e  ./Elite AI Bridge/frontend/qml/skin/holidays/art/confetti_gold.svg
+ab7638c0cf1fd7bc4d2b803a71d785da6d2f8997509875fc9552fd5e2acb8895  ./Elite AI Bridge/frontend/qml/skin/holidays/art/confetti_green.svg
+72f0e9be5b441b93d4e361dd025b5d9fc7a3823c4bed27aba7c30955bff410a0  ./Elite AI Bridge/frontend/qml/skin/holidays/art/confetti_pink.svg
+c8735e96d9b14acd44b115299f46c36a2120627599abd105a5ea08b17e327587  ./Elite AI Bridge/frontend/qml/skin/holidays/art/confetti_white.svg
+f6d9aa74cef6e26dd85d00792a83435a6e1df63c8393103fae4fd6573122da47  ./Elite AI Bridge/frontend/qml/skin/holidays/art/egg_blue.svg
+1e3325401e4cc2d031eb41f6fbc0bf768b7b855341bc4b06ae9ae3625a761f2f  ./Elite AI Bridge/frontend/qml/skin/holidays/art/egg_green.svg
+2522e09814d354a280eaa04a34112d26a0a299ba40155fa8c768cbdc738fcded  ./Elite AI Bridge/frontend/qml/skin/holidays/art/egg_pink.svg
+66029797c1c14fcf9fcdfe8113d7e4b883adffc58a3989a3b4f16fba1b25ddeb  ./Elite AI Bridge/frontend/qml/skin/holidays/art/egg_yellow.svg
+c777ff0a1f3d0ce5ed71c436bd958d92a8425ac957a7fdfbf42dfd067e37a932  ./Elite AI Bridge/frontend/qml/skin/holidays/art/flake_a.svg
+296695b54d4464d38f59d4c7a42a13b282fa0c192ce8b0523dcbf2b589465331  ./Elite AI Bridge/frontend/qml/skin/holidays/art/flake_b.svg
+a55ac9329fcb2290eee78231bf8ce94de81b3e9132baf219f0e6bbad94f09a3d  ./Elite AI Bridge/frontend/qml/skin/holidays/art/ghost.svg
+28895d547084bfd6103eddb80f354d8210af89f5e6fd62ba9a65d40c812b485c  ./Elite AI Bridge/frontend/qml/skin/holidays/art/gold_coin.svg
+63235d9d5f220ce3511e7a8b14a3e0714372ae1770322b42d0733ff26a95dab1  ./Elite AI Bridge/frontend/qml/skin/holidays/art/green_hat.svg
+f573676cecd088a62f02cb73aade906efd032393f95b6a43ecf0e70ba2f04d14  ./Elite AI Bridge/frontend/qml/skin/holidays/art/heart_box.svg
+b83bcaf0ff4993cedf6d571c7381d069d509eb5839d37993b3f91cddea8a94c1  ./Elite AI Bridge/frontend/qml/skin/holidays/art/heart_light.svg
+1c2d51d5ed388e705912838f573e3d618eb6f3a9c6ddee3e0b863bd6ca7f2a35  ./Elite AI Bridge/frontend/qml/skin/holidays/art/heart_pink.svg
+49b215795fea8feb230e04e88e548982ab711cd783187074d6c6f407bbc028c6  ./Elite AI Bridge/frontend/qml/skin/holidays/art/heart_rose.svg
+300f04153c601cfce87e8e8adfd18acd0756015dfa9277709116dbc1bd07d623  ./Elite AI Bridge/frontend/qml/skin/holidays/art/heart_white.svg
+d7a8b0a0136bc301e1b2413dc25057903185a1aa8233bb161abef8cd7e41f64c  ./Elite AI Bridge/frontend/qml/skin/holidays/art/jack_o_lantern.svg
+b98fcfc18ef58a4480e2c8a84c057e647a5fa31089f86ca99816b96a0847f0ab  ./Elite AI Bridge/frontend/qml/skin/holidays/art/lantern.svg
+795280238d6ba21aa16e12440c20498f13263d38255bbb083e390981ed36fffa  ./Elite AI Bridge/frontend/qml/skin/holidays/art/lantern_gold.svg
+a5bc6a06021d00864a9846df9719aae29a90652ad463df925e6630d387fb6adb  ./Elite AI Bridge/frontend/qml/skin/holidays/art/mandarin.svg
+152a1ff0e18dbd691ed7fd35a34cbcf439a4ff01680d2dfe47242d0d299da8fb  ./Elite AI Bridge/frontend/qml/skin/holidays/art/maple_brown.svg
+afca90531de9dd1680b47ef13ce6559a65f0c8199ec2fb6e66431f803ac46b62  ./Elite AI Bridge/frontend/qml/skin/holidays/art/maple_gold.svg
+20f6d9894d8fb4ae22b9105b5bc2917e50b15cddfd73205c570dc3ae8c80ec5e  ./Elite AI Bridge/frontend/qml/skin/holidays/art/maple_orange.svg
+ff842e3e6b9c7850f81a771ebcde237eae5c4597f887de06ef05db41e6e5ea6f  ./Elite AI Bridge/frontend/qml/skin/holidays/art/maple_red.svg
+5788c9fc71eec8b7938f096575aaaee9d75a28f4122597bc96a27074d266d4f4  ./Elite AI Bridge/frontend/qml/skin/holidays/art/oak_brown.svg
+aabe88e87d0cf53b50c64d5cfcfa1b5123022e2582f2ccf227f5be86ca13a25e  ./Elite AI Bridge/frontend/qml/skin/holidays/art/oak_rust.svg
+017a13e558ca4ca8ee14e60a32d0e6f15ca0eecb1b9e8989df882872b92efcf2  ./Elite AI Bridge/frontend/qml/skin/holidays/art/party_hat_blue.svg
+fe7e8068e56cf3ffb5f410ae488d6a314739839fcfaa646c22862a34c2d0ea9a  ./Elite AI Bridge/frontend/qml/skin/holidays/art/party_hat_gold.svg
+c9e8cf3e30e428136f3429bf7d80c2497bd489c6ab0c6ebd48d0b3db68d1cef1  ./Elite AI Bridge/frontend/qml/skin/holidays/art/plum_blossom.svg
+a77ec9a663897e93baaf4726fc7d6cd3a6bb417826591a1678af273ea3e71f92  ./Elite AI Bridge/frontend/qml/skin/holidays/art/popper.svg
+e2b14d804cfcd1b9c384247f9ca10639dc8f70c729600e0bc48afe6d889a60c1  ./Elite AI Bridge/frontend/qml/skin/holidays/art/pot_of_gold.svg
+fbbfd21860345a11e8c6c8083f2114670ffe6bcc8d60b2dd0e71b0e7f316970c  ./Elite AI Bridge/frontend/qml/skin/holidays/art/present_blue.svg
+d39bef79cbf6062c6d7ff7cb7714e4c8605815cd2901a16924263f40392be73d  ./Elite AI Bridge/frontend/qml/skin/holidays/art/present_gold.svg
+6c75a5024a33697d56f10c9cef05ab8d2c8adb7108de99a673031c6845694cf3  ./Elite AI Bridge/frontend/qml/skin/holidays/art/present_green.svg
+743b20abf1df16b715583d7468b5f3b586897e3f8a60f7918f9024d17c2df36b  ./Elite AI Bridge/frontend/qml/skin/holidays/art/present_red.svg
+b9bb6959d99177f90baa939b66e24de42bc18756d9ed9f5867fee33242e83b62  ./Elite AI Bridge/frontend/qml/skin/holidays/art/pumpkin.svg
+df56554e8acb75245a84d4686fdb331d88dedecbc926ac485101e58000ed35b5  ./Elite AI Bridge/frontend/qml/skin/holidays/art/red_envelope.svg
+39e3a788cd0521f32e4df9d46d8e0fd2d9cd18aefd155d7689c113a05aa4058e  ./Elite AI Bridge/frontend/qml/skin/holidays/art/rose.svg
+aa5c0038b9f1461d2d33a1b92b383552bae1348b3c66ffd7524f58fb0a9d46f5  ./Elite AI Bridge/frontend/qml/skin/holidays/art/shamrock.svg
+fff9ca18ede56d7a35015425293f6f65e8f8a4ca3ef060fa3d3afbb2491fe12c  ./Elite AI Bridge/frontend/qml/skin/holidays/art/shamrock_light.svg
+8622cc1b82bda8eeab181b69796fc0a9fc182c1c3bb5fe53ef265af371c9d042  ./Elite AI Bridge/frontend/qml/skin/holidays/art/star_gold.svg
+5f68f6fccdf5165b8d4b396082ed9d885ec6598b30e3909297009f26fa5c93ce  ./Elite AI Bridge/frontend/qml/skin/holidays/art/star_silver.svg
+8f0ab21cb118909281f8caaf50703c90a473507c40fca1cdb43fd725de3765f8  ./Elite AI Bridge/frontend/qml/skin/holidays/art/turkey_body.svg
+9cf585b0def7b7870926be0d5ed8666fe09001ec262b7a8c025227fc6bc3762d  ./Elite AI Bridge/frontend/qml/skin/holidays/art/turkey_fan.svg
+1af0eba3c6be4efaea7e6e25369be486ec55019be94e48512f4bd0f055c57bd3  ./Elite AI Bridge/frontend/qml/skin/holidays/art/turkey_head.svg
+71c10b2b4847a0d61e633f5dd582f72a302de7840b1bbcf5c6617101edf2f145  ./Elite AI Bridge/frontend/qml/skin/holidays/make_holiday_art.py
+8696264a5bb836e87b0e3d5dda2f195fe2ab179bd90d569f94a130e5d00515e6  ./Elite AI Bridge/frontend/qml/skin/holidays/Packs.js
 59860ab203dad150f91adb914f9d7f0329869a4d014b41cafa66c7c66556e0f5  ./Elite AI Bridge/frontend/qml/skin/Lamp.qml
+80d5d220be3f47f665ce20a631abce6a9710c7dcf1f4ea65d6c02a61e8b579fa  ./Elite AI Bridge/frontend/qml/skin/ListPicker.qml
 5a319eb23263d8fd75fdde383ce4e1c80f8c2f754e00af5b77b735683e60995f  ./Elite AI Bridge/frontend/qml/skin/LitButton.qml
 54d6333e81c35df41307981a05f568f0f51821141bd60b928872749980084b67  ./Elite AI Bridge/frontend/qml/skin/LogRow.qml
 8b4f4e5375000c0585021d1edff279d524d68cbef5339ee95d68174afb91925d  ./Elite AI Bridge/frontend/qml/skin/OnOffPair.qml
-c1f0643e80016a2122c5748271318b39dc573259859d234087cdcf3037ea6a02  ./Elite AI Bridge/frontend/qml/skin/OverlayPanels.qml
+8691cb7e1f509ef8974d937a611ecc9f00b41fc395f3a18fe5621209b8cfa242  ./Elite AI Bridge/frontend/qml/skin/OverlayPanels.qml
 99309e3960f2695a0312c69b6022a84404e82b91b514aac498bda128d1a23271  ./Elite AI Bridge/frontend/qml/skin/PhosphorList.qml
 ca07886fc91214e902f0cb8675750a4848097c48c755f689b5f3ce2375238d9a  ./Elite AI Bridge/frontend/qml/skin/Plate.qml
 7c72538d8d6d7e96c05b5a80b65e75b18cf39f407bb85baeff00c0b6d2c081a5  ./Elite AI Bridge/frontend/qml/skin/PressArea.qml
@@ -119,25 +184,37 @@ d2ada183d230fc87b4968a497a23c59c516d1f3d193037516b594047b06095a0  ./Elite AI Bri
 552202bc4000df9a9b40094ac0660fe6f6171b1270d63caf8bfee750e7bd2d18  ./Elite AI Bridge/frontend/qml/skin/textures/tex_plate.jpg
 355a4be0432eb66fde64b82e91edc384b11497cd35c731850bbf6bd01f8b54a3  ./Elite AI Bridge/frontend/qml/skin/textures/tex_tape.png
 5d99e0f68979aeb378b39138e513c990ddb135c1e5ead76d8dff5fae7f1a3c2d  ./Elite AI Bridge/frontend/qml/skin/textures/tex_wear.png
-326cf89db40e06301912d51e8ae665fd289d0353fc871bcfeb0ff82a7968a68e  ./Elite AI Bridge/frontend/qml/skin/Theme.qml
-ca4f0da22771106fcf6c90706f23eb55627a1a7eb209851f33e0c5219a01fd87  ./Elite AI Bridge/frontend/qml/skin/VoiceScope.qml
-7c6f01bd8b7696903fa418cda1b5ebf7cb47d379a72671fa86af444af5a2b2d8  ./Elite AI Bridge/frontend/qml/skin/WaveLine.qml
+5c3d280a6d1730363724032f4a8ad6143d453368c0e0cd74b49bfbcf03583529  ./Elite AI Bridge/frontend/qml/skin/Theme.qml
+2a1ea41cd0756725c6ae59ae6a2fe7b6d0b4093c03ed786401adba764e7b1f6b  ./Elite AI Bridge/frontend/qml/skin/VoiceScope.qml
+4910d76da617d18f618200eee815d6c42bcc4a6101405a29cc38858a8bac4a55  ./Elite AI Bridge/frontend/qml/skin/WaveLine.qml
 bb93429443a8597d404b04e6324dd2f43673343dc57723493d2be2b089adeff3  ./Elite AI Bridge/frontend/README.txt
 7291fa91100ddb49c1c49c5b27a831aa5d40dc5da2e2bac2791d9044b7271139  ./Elite AI Bridge/frontend/requirements.txt
+535e9f457ce4cda28ce3815161a1c1e9d3ac0c90fc50e319f3864a55a5640e25  ./Elite AI Bridge/frontend/sounds/chirp.wav
+6a152a2b99918435ad7f25512b6c974d182a8ae8d9df2b00c65d25340dd186bf  ./Elite AI Bridge/frontend/sounds/coins.wav
+6ad2c8b41a4397c88cb6c39e0d9f1637d21876ea84dc4651881c31ee27dd767f  ./Elite AI Bridge/frontend/sounds/gobble.wav
+513bcb4dcb1d1668d301db061e4ca3d505b61f07d0d904aa06024f0e1fe30f70  ./Elite AI Bridge/frontend/sounds/gong.wav
+0e529afef53639191220ed22c2f39e2210ebde7f4f3eb88c5d2e425cb4606078  ./Elite AI Bridge/frontend/sounds/harp.wav
+65146627298934f0fc392a002021c8ffda3d67453860517e34f530d0540e9f29  ./Elite AI Bridge/frontend/sounds/jingle.wav
+41fa211a1331673e352df8827ce28197440b9e24006717c56e818b3524cdb4e1  ./Elite AI Bridge/frontend/sounds/knock.wav
+85fa62382e7f6a83e7c8a5c106c30645f5b57031c0e419b140ca49df6a629cc2  ./Elite AI Bridge/frontend/sounds/make_decor_sounds.py
 201dd7c9ce8012331665816fa97323e83ed0fe9791876adcfb6538cb89c0fcc8  ./Elite AI Bridge/frontend/sounds/make_splash_sound.py
+0d3f90aa9ba3d01d235221467e70e6f164959e1b8321a4132d4f8af66ebb4c3f  ./Elite AI Bridge/frontend/sounds/noisemaker.wav
+bf69227ec085de6484d6f3c35c07ca29c048c946cee61b79c62936836419e46c  ./Elite AI Bridge/frontend/sounds/pop.wav
+1b1ed5ba413c053dcbd362bd3350b13905732f2955f8077c158803712b5af632  ./Elite AI Bridge/frontend/sounds/secret.wav
 0d24e29121daac883040cf62ff75c30155d58948cf4a46b2ae828787761f3092  ./Elite AI Bridge/frontend/sounds/splash_boot.wav
 5616ab6dc7636b96daf5849451d14e368d60ff85a4d0a180c404e39973545588  ./Elite AI Bridge/frontend/sounds/splash_off.wav
+693d2b0f7362ca5b5c20a125fa79a617c834ef08cc1b90f2ee853e3a1418ef3d  ./Elite AI Bridge/frontend/sounds/spooky.wav
 a32079c50a6390bded34b0d0eb2779c1b83f9e964083b6c452482ed3f73ba101  ./Elite AI Bridge/frontend/splash_preview.py
 98992a1939c757f87f4c855a07691c850bee3e6e194b4e173610d90a2f74791d  ./Elite AI Bridge/Installer_Runtime_Setup.ps1
 acf0f993ec25b93ac45b7a60bc90ab5a47211a3631104b081cbad71c386e2459  ./Elite AI Bridge/README.txt
 788200245b3ea2d6b75599a7b6695dbf41732ba1a2c7c50a5a63382d5d527a49  ./Elite AI Bridge/requirements.txt
 e8fbc55e0caa7375d512f08996f683eb1f28e1add9e1a03b428cf6fe6b736711  ./Elite AI Bridge/START_HERE.bat
-1fca9434f0e9414df01e25567796a90dd9ff6e9f317866c98c596729857fdd4c  ./Elite_AI_Bridge_Setup.iss
+8134ad41283bf14b4a5d073b6be71cb103df4eb30c1ec628ebaf35ca5d4968d5  ./Elite_AI_Bridge_Setup.iss
 2dc039694aaee2135a916ee3b326a6b7be328b64c1ad378281412b495d973fe1  ./LICENSE.txt
 63542f07c316604f6dfc1a914fcfd0b824efd24e16053876a891af8ca08c3c47  ./PRIVACY_AND_API_KEYS.md
-7318c6af6c383a7546e34dce3ab1adb8776d44e0e24e762dc4b085056eedf198  ./README.md
+5e594d4f30557ad74576a0f8a4c60067444f98e1cf6b1d74ec76a89ef095886c  ./README.md
 9429472b8e77c87045d3d07e851e8ae86d2e9a4f8f41c74e7d57a51a26c9c321  ./README_BOOT_SPLASH.md
-39c0730aa038d840ae673e9691809820efafc3e0e285e67277b6c729281aec64  ./README_BUILD.txt
+726f969fc35eee2e62f9a1a5dfbcc980741a3b85ec7cccfc6d84dd0e8eae6883  ./README_BUILD.txt
 1c0e238a3cf455791bd6b1353df012c2b0c81ae5e9291220979b4cc725716dc3  ./README_FIRST.txt
 788200245b3ea2d6b75599a7b6695dbf41732ba1a2c7c50a5a63382d5d527a49  ./requirements.txt
 88ad8394d86a60c316213302f239a109ccf4dc0c4a9bb5c41b2e60ff7bc1e3b5  ./RUN_CURRENT_SOURCE.bat

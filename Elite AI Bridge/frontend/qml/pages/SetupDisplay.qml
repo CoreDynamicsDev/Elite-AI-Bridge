@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Window
 import QtQml
 import "../skin"
+import "../skin/holidays/Packs.js" as HolidayPacks
 
 Item {
     id: dp
@@ -91,25 +92,48 @@ Item {
         x: 0; y: winPlate.height + dp.g; width: dp.leftW; height: dp.bodyH - y
         screwSize: 13 * dp.s
         Dymo { x: 26 * dp.s; y: 14 * dp.s; text: "SCREEN EFFECTS" }
-        // LAB themes: screen colour. Only the screens change; keys, lamps and plates stay.
+        Blurb { id: fb; x: 26 * dp.s; y: 62 * dp.s; width: parent.width - 52 * dp.s
+                text: "The old-monitor look on the screens. Faders preview as you drag and save when you let go. Both at 0 turns it off." }
+        // LAB: THEME (screen colour; keys, lamps and plates never change) and HOLIDAYS
+        // (decorations, ON follows the date). Both are lists that will grow, so both use
+        // the same < VALUE > picker with a drop-down list.
         Row {
-            id: themeRow
-            anchors.right: parent.right; anchors.rightMargin: 26 * dp.s; y: 12 * dp.s
-            spacing: 12 * dp.s
-            Text { anchors.verticalCenter: parent.verticalCenter; text: "THEME"; color: Theme.plateText; opacity: 0.8
-                   font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * dp.s); font.letterSpacing: 2 * dp.s }
-            SelectorRow {
-                readonly property var vals: ["GREEN", "AMBER"]
-                options: ["GREEN", "OLD SCHOOL AMBER"]
-                buttonWidth: 170 * dp.s; buttonHeight: 40 * dp.s
-                currentIndex: Math.max(0, vals.indexOf(String(bridge.screenTheme)))
-                onPicked: (i) => bridge.setScreenTheme(vals[i])
+            id: pickRow
+            x: 26 * dp.s; y: fb.y + fb.height + 12 * dp.s
+            width: parent.width - 52 * dp.s
+            spacing: 20 * dp.s
+            Column {
+                width: (pickRow.width - pickRow.spacing) / 2; spacing: 5 * dp.s
+                Text { text: "THEME"; color: Theme.plateText; opacity: 0.8
+                       font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * dp.s); font.letterSpacing: 2 * dp.s }
+                ListPicker {
+                    width: parent.width; height: 42 * dp.s
+                    options: Theme.themeMenu
+                    value: String(bridge.screenTheme)
+                    onPicked: (v) => bridge.setScreenTheme(v)
+                }
+            }
+            Column {
+                width: (pickRow.width - pickRow.spacing) / 2; spacing: 5 * dp.s
+                Text { text: "HOLIDAYS"; color: Theme.plateText; opacity: 0.8
+                       font.family: Theme.labelFont; font.pixelSize: Math.max(9, 14 * dp.s); font.letterSpacing: 2 * dp.s }
+                ListPicker {
+                    width: parent.width; height: 42 * dp.s
+                    options: HolidayPacks.menu()
+                    value: String(bridge.holidayMode)
+                    onPicked: (v) => bridge.setHolidayMode(v)
+                }
             }
         }
-        Blurb { id: fb; x: 26 * dp.s; y: 62 * dp.s; width: parent.width - 52 * dp.s
-                text: "The old-monitor look on the Bridge screens. THEME picks the screen colour. Drag the faders to preview, they save when you let go. Both at 0 turns the effect off and saves GPU." }
+        Text {
+            id: holidayNote
+            x: 26 * dp.s; y: pickRow.y + pickRow.height + 6 * dp.s; width: parent.width - 52 * dp.s; elide: Text.ElideRight
+            text: Theme.holiday !== "" ? "ON NOW: " + HolidayPacks.PACKS[Theme.holiday].label + " // ITS COLOURS FOR NOW // PICKING A THEME TURNS HOLIDAYS OFF"
+                                       : (String(bridge.holidayMode) === "OFF" ? "HOLIDAYS OFF // SET HOLIDAYS TO ON TO BRING THEM BACK" : "ON // NO HOLIDAY TODAY")
+            color: Theme.plateText; opacity: 0.6; font.family: Theme.labelFont; font.pixelSize: Math.max(8, 12 * dp.s); font.letterSpacing: 1.5 * dp.s
+        }
         Column {
-            x: 26 * dp.s; y: fb.y + fb.height + 16 * dp.s
+            x: 26 * dp.s; y: holidayNote.y + holidayNote.height + 10 * dp.s
             width: parent.width - 52 * dp.s
             spacing: 18 * dp.s
             readonly property real fh: Math.min(130 * dp.s, (fxPlate.height - y - 40 * dp.s) / 2 - spacing)

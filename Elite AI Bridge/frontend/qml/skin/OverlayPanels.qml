@@ -66,7 +66,7 @@ Item {
         Rectangle { x: 0; y: 6 * ov.f; width: Math.max(3, 5 * ov.f); height: parent.height - 12 * ov.f; radius: 2; color: g.tint; opacity: 0.9 }
         // scanlines
         Canvas {
-            property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+            property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
             onThemeAmberChanged: requestPaint()
             anchors.fill: parent; anchors.margins: 2; opacity: 0.5
             onPaint: { var c = getContext("2d"); c.reset(); c.fillStyle = "rgba(0,0,0,0.22)"

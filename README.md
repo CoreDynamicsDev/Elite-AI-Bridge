@@ -22,7 +22,8 @@ Only download the installer from there.
   Clear and Jump, and station services are one click each.
 - **Combat:** target information, fighter and wing controls, and Bounty Hunting, which
   finds nearby Resource Extraction Sites by danger level.
-- **Trade:** route search, a trade loop that plots each next leg, and a trip ledger.
+- **Trade:** route search with landing pad and space-station filters, a trade loop that
+  plots each next leg, and a trip ledger.
 - **Navigation:** follows the route you are flying, with fuel stars and bookmarks.
 - **Colonization:** construction progress, what is left to haul, and where to buy it.
 - **Commander:** ranks, career totals, this session, and a few odd stats.
@@ -33,6 +34,8 @@ Only download the installer from there.
 - **In-game overlay:** a small click-through panel over Elite (borderless or windowed mode).
 - **Ship voice:** spoken alerts and callouts, generated locally on your PC.
 - **Setup wizard and guided tours:** every page has a short spoken tour on its ? key.
+- **Screen colours and holidays:** ten screen colours, and seasonal decorations through
+  the year (on by default, follows the date, one switch to turn off).
 
 ## AI Co-Pilot and OpenAI
 AI features are optional. Everything above works without an OpenAI API key.

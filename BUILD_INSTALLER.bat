@@ -20,5 +20,5 @@ if errorlevel 1 (
 )
 echo.
 echo COMPLETE:
-echo Output\Elite_AI_Bridge_Setup_2.0.5.exe
+echo Output\Elite_AI_Bridge_Setup_2.0.6.exe
 pause

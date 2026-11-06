@@ -9668,6 +9668,50 @@ class HeadlessBridgeApp(legacy.BridgeApp):
                 out.append((action, self._qml_key_text(b), cam))
         return out
 
+    # ---- Trade search filters (2026-11-01, tester request) ---------------------
+    # Trade page PAD (SHIP / L / M / ANY) and STATIONS (ALL / SPACE). .95 always kept only
+    # stations whose pads fit the ship you're flying and only ranked planetary ports lower.
+    # Every route search (best trade, commodity routes, colony supply) goes through this.
+    def _qml_trade_filters(self):
+        host = getattr(self, "_qml_host", None)
+        ov = dict(getattr(host, "setup_overrides", {}) or {}) if host is not None else {}
+        pad = str(ov.get("trade_pad") or "SHIP").upper()
+        return (pad if pad in ("SHIP", "L", "M", "ANY") else "SHIP"), ("SPACE" if str(ov.get("trade_stations") or "").upper() == "SPACE" else "ALL")
+
+    def _qml_drop_surface(self, rows):
+        kept, removed = [], 0
+        for row in rows:
+            try:
+                env = self._enrich_loop_market_row(row).get("environment")
+            except Exception:
+                env = "UNKNOWN"
+            if env == "SURFACE":
+                removed += 1
+            else:
+                kept.append(row)          # ORBITAL, and UNKNOWN (no station type in the data) stay
+        return kept, removed
+
+    def _filter_rows_ship_compatible_explicit(self, rows, enabled=True):
+        pad, stations = self._qml_trade_filters()
+        if pad == "SHIP":
+            rows, removed = super()._filter_rows_ship_compatible_explicit(rows, enabled)
+        elif pad in ("L", "M"):
+            need = 3 if pad == "L" else 2
+            kept, removed = [], 0
+            for row in rows:
+                code = self._market_pad_code(row.get("pad"))
+                if code is not None and code < need:
+                    removed += 1
+                else:
+                    kept.append(row)
+            rows = kept
+        else:
+            rows, removed = list(rows), 0
+        if stations == "SPACE":
+            rows, gone = self._qml_drop_surface(rows)
+            removed += gone
+        return rows, removed
+
     def _qml_plot_keys_ok(self, text):
         """False (and says why) when a key the plot needs is also a Galaxy Map camera key."""
         try:
@@ -11691,6 +11735,9 @@ SETUP_OVERRIDE_DEFAULTS = {
     # 2026-10-25 Mining page LOOKING FOR: up to 3 commodities the commander wants to find
     "mining_wanted": [],
     "raw_targets": {},          # 2026-10-28: {"Iron": 150}, set by tapping a raw on Mining > RHINO + RAW
+    # 2026-11-01 Trade search filters (tester request): landing pad and space stations only
+    "trade_pad": "SHIP",        # SHIP (fits the ship you're flying) / L / M / ANY
+    "trade_stations": "ALL",    # ALL / SPACE (no planetary ports)
     # 2026-10-25 COLLECTOR key: which fire group and trigger launch collector limpets
     "collector_group": "A",
     "collector_fire": "SECONDARY",
@@ -12152,6 +12199,9 @@ class BridgeHost:
         wanted = data.get("mining_wanted")
         data["mining_wanted"] = [str(x).strip()[:40] for x in wanted if str(x).strip()][:3] if isinstance(wanted, list) else []
         data["raw_targets"] = _raw_targets_clean(data.get("raw_targets"))
+        pad = str(data.get("trade_pad") or "SHIP").strip().upper()
+        data["trade_pad"] = pad if pad in ("SHIP", "L", "M", "ANY") else "SHIP"
+        data["trade_stations"] = "SPACE" if str(data.get("trade_stations") or "").strip().upper() == "SPACE" else "ALL"
         data["ai_context"] = str(data.get("ai_context") or "").strip()[:1000]
         if not bool(data.get("ai_context_seeded", False)):
             if not data["ai_context"]:
@@ -13676,7 +13726,7 @@ class BridgeHost:
                             "auto_chaff", "auto_chaff_profile", "ai_trade_auto", "ai_mission_auto", "ai_travel_auto",
                             "ai_smart_auto", "commander_address", "ai_context", "ai_tool_mode", "bridge_mode",
                             "debrief_on_start", "powerplay_callouts", "mining_wanted", "collector_group", "collector_fire", "collector_confirmed",
-                            "raw_targets",
+                            "raw_targets", "trade_pad", "trade_stations",
                         }
                         if name not in allowed_setup_names:
                             self._json(400, {"ok": False, "error": "valid setup setting name required"})
@@ -13688,6 +13738,13 @@ class BridgeHost:
                             value = [x.strip()[:40] for x in str(value or "").split(",") if x.strip()][:3]
                         elif name == "raw_targets":
                             value = _raw_targets_clean(value)
+                        elif name == "trade_pad":
+                            value = str(value or "SHIP").strip().upper()
+                            if value not in ("SHIP", "L", "M", "ANY"):
+                                self._json(400, {"ok": False, "error": "pad SHIP, L, M or ANY"})
+                                return
+                        elif name == "trade_stations":
+                            value = "SPACE" if str(value or "").strip().upper() == "SPACE" else "ALL"
                         elif name == "collector_group":
                             value = str(value or "A").strip().upper()[:1]
                             if not value or value not in "ABCDEFGH":
@@ -14165,6 +14222,8 @@ class BridgeHost:
         snap["tradeStolenAboard"] = stolen
         snap["tradeLegLy"] = float(getattr(self, "trade_active_leg_ly", 0.0) or 0.0)
         snap["tradeActiveRestricted"] = bool(getattr(self, "trade_active_restricted", False))
+        snap["tradePad"] = str(self.setup_overrides.get("trade_pad") or "SHIP")
+        snap["tradeStations"] = str(self.setup_overrides.get("trade_stations") or "ALL")
 
     def drain_commands(self):
         if self.app is None:
@@ -14699,7 +14758,7 @@ class BridgeHost:
                                 self.setup_overrides[name] = bool(value); self._save_setup_overrides()
                             elif name == "mining_wanted":
                                 self.setup_overrides[name] = list(value); self._save_setup_overrides()
-                            elif name in ("collector_group", "collector_fire"):
+                            elif name in ("collector_group", "collector_fire", "trade_pad", "trade_stations"):
                                 self.setup_overrides[name] = str(value); self._save_setup_overrides()
                             elif name == "collector_confirmed":
                                 self.setup_overrides[name] = bool(value); self._save_setup_overrides()

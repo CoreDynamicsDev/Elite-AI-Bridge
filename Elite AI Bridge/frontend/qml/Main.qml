@@ -823,6 +823,7 @@ Window {
         noticeLevel: root.deckNoticeLevel
         onUpdatePressed: root.currentPage = 8
         onDeliveriesPressed: { root.currentPage = 5; commanderPage.showDeliveries() }
+        onTitleTapped: holidayDecor.titleTap()
         onMasterCautionPressed: {
             // Setup problems are listed on SETUP > SYSTEM. Flight alerts are already on the header screen.
             if (header.setupProblems.length > 0 && !header.shieldsDown && !header.flightAlert) {
@@ -1030,6 +1031,20 @@ Window {
 
 
     // In-game overlay (v2, retro skin). Frameless, always on top, click-through.
+    // Holiday decorations (LAB 2026-11-05): garlands, props and the falling layer, over
+    // every page. Decoration only, no clicks. Setup > Display > HOLIDAYS turns it off.
+    HolidayDecor {
+        id: holidayDecor
+        objectName: "holidayDecor"
+        anchors.fill: parent
+        z: 900
+        packName: Theme.holiday
+        running: visible && root.visibility !== Window.Minimized
+        headerRect: Qt.rect(header.x, header.y, header.width, header.height)
+        navRect: Qt.rect(nav.x, nav.y, nav.width, nav.height)
+        onSecretToggled: (on) => root.showDeckNotice(on ? "LOST CARGO" : "CARGO RECOVERED", on ? "YOU FOUND A SECRET // TAP THE TITLE 5 TIMES TO STOP IT" : "SECRET OFF", "info")
+    }
+
     // Panels: skin/OverlayPanels.qml. State: bridge.bridgeActivity (main.py), one
     // place for the logic. LEFT / CENTER / RIGHT stack the panels; stale TOP reads as RIGHT.
     Loader {

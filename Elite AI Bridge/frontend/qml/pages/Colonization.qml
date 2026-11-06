@@ -672,7 +672,7 @@ Item {
             return secR[secR.length - 1] * width
         }
         Canvas {
-            property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+            property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
             onThemeAmberChanged: requestPaint()
             id: cv
             anchors.fill: parent

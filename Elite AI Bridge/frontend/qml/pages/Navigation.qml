@@ -189,7 +189,7 @@ Item {
 
                 // faint grid
                 Canvas {
-                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                     onThemeAmberChanged: requestPaint()
                     id: grid
                     anchors.fill: parent; opacity: 0.5
@@ -204,7 +204,7 @@ Item {
                 }
                 // dashed links between node rims
                 Canvas {
-                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                     onThemeAmberChanged: requestPaint()
                     id: links
                     anchors.fill: parent

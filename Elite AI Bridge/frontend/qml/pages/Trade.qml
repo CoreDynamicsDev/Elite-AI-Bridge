@@ -589,7 +589,7 @@ Item {
                 property real march: 0
                 NumberAnimation on march { from: 0; to: 1; duration: 1400; loops: Animation.Infinite; running: tr.visible && tr.tradeView === 1 && tr.hasLoop && tr.runActive }
                 Canvas {
-                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                     onThemeAmberChanged: requestPaint()
                     id: loopCanvas
                     anchors.fill: parent
@@ -1051,6 +1051,55 @@ Item {
         }
         GroupLabel { x: findRow.x + useKey.x + (plotBuyFind.x + plotBuyFind.width - useKey.x) / 2 - width / 2; y: findDeck.keyY - height - 6 * tr.s; text: "PICKED ROUTE" }
         CancelKey { x: findDeck.width - findDeck.cancelW - 40 * tr.s; y: findDeck.keyY; width: findDeck.cancelW; height: findDeck.keyH }
+        // search filters (Bailey): landing pad size and space stations only. Saved, used by every search.
+        Item {
+            id: filterBox
+            readonly property real lx: findRow.x + findRow.width + 44 * tr.s
+            readonly property real rx: findDeck.width - findDeck.cancelW - 40 * tr.s - 44 * tr.s
+            readonly property real gap: 34 * tr.s
+            readonly property real bw: Math.min(118 * tr.s, (rx - lx - gap - 10 * padSel.spacing) / 6.2)
+            readonly property real bh: Math.min(56 * tr.s, findDeck.keyH * 0.42)
+            x: lx + Math.max(0, (rx - lx - width) / 2)
+            y: findDeck.keyY + (findDeck.keyH - bh) / 2
+            width: padSel.width + gap + stnSel.width; height: bh
+            readonly property var padValues: ["SHIP", "L", "M", "ANY"]
+            readonly property var stnValues: ["ALL", "SPACE"]
+            Item {
+                id: padBox
+                width: padSel.width; height: filterBox.bh
+                GroupLabel { y: -height - 8 * tr.s; text: "LANDING PAD" }
+                SelectorRow {
+                    id: padSel
+                    options: ["MY SHIP", "LARGE", "MEDIUM", "ANY"]
+                    buttonWidth: filterBox.bw; buttonHeight: filterBox.bh
+                    currentIndex: Math.max(0, filterBox.padValues.indexOf(bridge.tradePad))
+                    onPicked: (i) => bridge.setSetupValue("trade_pad", filterBox.padValues[i])
+                }
+                Text {
+                    y: filterBox.bh + 6 * tr.s; width: padSel.width; elide: Text.ElideRight
+                    text: ["FITS THE SHIP YOU FLY", "LARGE PADS ONLY", "MEDIUM OR LARGE PADS", "NO PAD CHECK"][padSel.shownIndex]
+                    color: Theme.dimText; font.family: Theme.labelFont; font.pixelSize: Math.max(7, 11 * tr.s); font.letterSpacing: 1.5 * tr.s
+                }
+            }
+            Item {
+                id: stnBox
+                x: padBox.width + filterBox.gap
+                width: stnSel.width; height: filterBox.bh
+                GroupLabel { y: -height - 8 * tr.s; text: "STATIONS" }
+                SelectorRow {
+                    id: stnSel
+                    options: ["ALL", "SPACE ONLY"]
+                    buttonWidth: filterBox.bw * 1.1; buttonHeight: filterBox.bh
+                    currentIndex: bridge.tradeStations === "SPACE" ? 1 : 0
+                    onPicked: (i) => bridge.setSetupValue("trade_stations", filterBox.stnValues[i])
+                }
+                Text {
+                    y: filterBox.bh + 6 * tr.s; width: stnSel.width; elide: Text.ElideRight
+                    text: stnSel.shownIndex === 1 ? "NO PLANET SURFACE PORTS" : "SPACE AND SURFACE"
+                    color: Theme.dimText; font.family: Theme.labelFont; font.pixelSize: Math.max(7, 11 * tr.s); font.letterSpacing: 1.5 * tr.s
+                }
+            }
+        }
     }
 
     // ---------------------------------------------------- MY RUN deck

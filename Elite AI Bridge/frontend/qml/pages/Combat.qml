@@ -200,7 +200,7 @@ Item {
                     // amber shield ring: back half behind the ship, front half over it.
                     // The lit arc (target shield %) orbits once every 24 s.
                     Canvas {
-                        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                        property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                         onThemeAmberChanged: requestPaint()
                         id: ringBack
                         anchors.fill: parent
@@ -233,7 +233,7 @@ Item {
                         line3: ""
                     }
                     Canvas {
-                        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                        property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                         onThemeAmberChanged: requestPaint()
                         id: ringFront
                         anchors.fill: parent

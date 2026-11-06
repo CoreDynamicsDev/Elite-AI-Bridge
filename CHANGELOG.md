@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.6 - 2026-11-06
+
+### New
+- Trade search filters on the FIND A ROUTE deck: LANDING PAD (MY SHIP, LARGE, MEDIUM, ANY)
+  and STATIONS (ALL, SPACE ONLY). Saved, and used by every route search; Colonization's
+  WHERE TO BUY list uses them too and says how many stations it hid.
+- Holidays: seasonal decorations through the year, on by default and following the date
+  (New Year, Valentine's Day, Lunar New Year, St. Patrick's Day, Easter, Halloween, Autumn,
+  Christmas). Each brings a screen colour, edge decorations, a falling layer that fades in
+  and out at the window edges, and its own click sound. Decoration only: no game reactions,
+  not on the in-game overlay, paused while minimized. Setup > Display > HOLIDAYS: ON, OFF or
+  one holiday.
+- Ten screen colours in Setup > Display > THEME (Green, Old School Amber, Copper, Gold,
+  Emerald, Jade, Sky Blue, Ice Blue, Purple, Rose). Picking a colour turns holidays off.
+- THEME and HOLIDAYS use a new list picker (arrows, or click for a drop-down list).
+
 ## 2.0.5 - 2026-11-01
 
 ### New

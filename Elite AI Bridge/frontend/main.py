@@ -118,7 +118,7 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.5"
+APP_VERSION = "2.0.6"
 # 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
 # It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
 UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"
@@ -579,6 +579,8 @@ class BridgeViewModel(QObject):
             "tradeBestBusy": False,
             "tradeBestStatus": "READY // FIND THE BEST COMMODITY + LOOP",
             "tradeBestRows": [],
+            "tradePad": "SHIP",
+            "tradeStations": "ALL",
             "tradeCommodity": "-",
             "tradeCommodityOptions": [],
             "tradeConfiguredCargo": 0,
@@ -1532,6 +1534,8 @@ class BridgeViewModel(QObject):
     # GREEN (default) or AMBER ("OLD SCHOOL AMBER"). Only the screen colour changes;
     # Theme.qml does the colour work. Saved in QSettings display/screen_theme.
     themeChanged = Signal()
+    # names match Theme.qml themeMenu / _pal (2026-11-06: holiday colours added as themes)
+    SCREEN_THEMES = ("GREEN", "AMBER", "COPPER", "GOLD", "EMERALD", "JADE", "SKY", "ICE", "PURPLE", "ROSE")
 
     @Property(str, notify=themeChanged)
     def screenTheme(self) -> str:
@@ -1539,18 +1543,68 @@ class BridgeViewModel(QObject):
             v = str(self._settings.value("display/screen_theme", "GREEN") or "GREEN").upper()
         except Exception:
             v = "GREEN"
-        return v if v in ("GREEN", "AMBER") else "GREEN"
+        return v if v in self.SCREEN_THEMES else "GREEN"
 
     @Slot(str)
     def setScreenTheme(self, theme: str) -> None:
         theme = str(theme or "").strip().upper()
-        if theme not in ("GREEN", "AMBER"):
+        if theme not in self.SCREEN_THEMES:
             theme = "GREEN"
         if theme == self.screenTheme:
             return
         self._settings.setValue("display/screen_theme", theme)
+        # A holiday sets its own screen colour, so you can't have both: picking a colour
+        # turns holidays OFF (Michael 2026-11-06). HOLIDAYS > ON brings them back.
+        holidays_off = self.holidayMode != "OFF"
+        if holidays_off:
+            self._settings.setValue("display/holiday_mode", "OFF")
         self._settings.sync()
         self.themeChanged.emit()
+        if holidays_off:
+            self.holidayChanged.emit()
+
+    # ---- LAB: holidays (Setup > Display > HOLIDAYS) 2026-11-05 ---------------------
+    # AUTO (by date), OFF, or one pack by name. Theme.qml picks the pack, HolidayDecor.qml
+    # draws it. Saved in QSettings display/holiday_mode. Names match qml/skin/holidays/Packs.js.
+    HOLIDAY_MODES = ("AUTO", "OFF", "NEW_YEAR", "VALENTINES", "LUNAR_NEW_YEAR", "ST_PATRICKS", "EASTER", "HALLOWEEN", "AUTUMN", "CHRISTMAS")
+    holidayChanged = Signal()
+
+    @Property(str, notify=holidayChanged)
+    def holidayMode(self) -> str:
+        try:
+            v = str(self._settings.value("display/holiday_mode", "AUTO") or "AUTO").upper()
+        except Exception:
+            v = "AUTO"
+        if v == "THANKSGIVING":
+            v = "AUTUMN"          # renamed 2026-11-06
+        return v if v in self.HOLIDAY_MODES else "AUTO"
+
+    @Slot(str)
+    def setHolidayMode(self, mode: str) -> None:
+        mode = str(mode or "").strip().upper()
+        if mode not in self.HOLIDAY_MODES:
+            mode = "AUTO"
+        if mode == self.holidayMode:
+            return
+        self._settings.setValue("display/holiday_mode", mode)
+        self._settings.sync()
+        self.holidayChanged.emit()
+
+    # Easter egg sounds (turkey gobble, present pop, secret found). Played the same way as
+    # the startup sound (boot_splash._Sound: winsound, scaled to the sound-effects level).
+    @Slot(str)
+    def playDecorSound(self, name: str) -> None:
+        name = str(name or "").strip().lower()
+        if name not in ("gobble", "pop", "secret", "noisemaker", "harp", "coins", "chirp", "gong", "spooky", "knock", "jingle"):
+            return
+        def _play():
+            try:
+                import boot_splash
+                _on, vol = boot_splash._sound_settings()
+                boot_splash._Sound(name + ".wav", vol).play()
+            except Exception:
+                pass
+        self._executor.submit(_play)
 
     # ---- LAB: startup sound (boot splash) --------------------------------------------
     # Played by boot_splash.py from its own QSettings read, before the backend is up, so
@@ -3911,6 +3965,12 @@ class BridgeViewModel(QObject):
 
     @Property(str, notify=stateChanged)
     def tradeBestStatus(self): return _string(self._get("tradeBestStatus"), "READY // FIND THE BEST COMMODITY + LOOP")
+
+    @Property(str, notify=stateChanged)
+    def tradePad(self): return _string(self._get("tradePad"), "SHIP")
+
+    @Property(str, notify=stateChanged)
+    def tradeStations(self): return _string(self._get("tradeStations"), "ALL")
 
     @Property('QVariantList', notify=stateChanged)
     def tradeBestRows(self): return list(self._get("tradeBestRows", []) or [])

@@ -23,7 +23,7 @@ Item {
     NumberAnimation on th { from: 0; to: 2 * Math.PI; duration: 4000; loops: Animation.Infinite; running: sc.visible }
 
     Canvas {
-        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+        property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
         onThemeAmberChanged: requestPaint()
         id: cv
         anchors.fill: parent

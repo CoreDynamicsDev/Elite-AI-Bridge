@@ -222,7 +222,7 @@ Item {
                     visible: mid.mode === "charge"
                     anchors.fill: parent
                     Canvas {
-                        property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                        property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                         onThemeAmberChanged: requestPaint()
                         id: ring
                         width: Math.min(parent.width, parent.height * 0.80); height: width

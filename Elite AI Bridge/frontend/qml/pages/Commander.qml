@@ -192,7 +192,7 @@ Item {
             }
             // dial
             Canvas {
-                property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                 onThemeAmberChanged: requestPaint()
                 id: dial
                 x: 12 * tile.u; y: 40 * tile.u
@@ -320,7 +320,7 @@ Item {
                 id: holo
                 x: 0; y: 0; width: sBezel.iw * 0.5; height: sBezel.ih
                 Canvas {
-                    property bool themeAmber: Theme.amber   // LAB themes: repaint when the screen theme changes
+                    property string themeAmber: Theme.screenPalette   // LAB themes: repaint when the screen theme changes
                     onThemeAmberChanged: requestPaint()
                     id: stand
                     anchors.fill: parent
