@@ -132,20 +132,22 @@ Item {
                                        : (String(bridge.holidayMode) === "OFF" ? "HOLIDAYS OFF // SET HOLIDAYS TO ON TO BRING THEM BACK" : "ON // NO HOLIDAY TODAY")
             color: Theme.plateText; opacity: 0.6; font.family: Theme.labelFont; font.pixelSize: Math.max(8, 12 * dp.s); font.letterSpacing: 1.5 * dp.s
         }
-        Column {
-            x: 26 * dp.s; y: holidayNote.y + holidayNote.height + 10 * dp.s
+        // the two faders sit side by side (stacked, they ran into each other at 1600x900)
+        Row {
+            x: 26 * dp.s; y: holidayNote.y + holidayNote.height + 14 * dp.s
             width: parent.width - 52 * dp.s
-            spacing: 18 * dp.s
-            readonly property real fh: Math.min(130 * dp.s, (fxPlate.height - y - 40 * dp.s) / 2 - spacing)
+            spacing: 24 * dp.s
+            readonly property real fw: (width - spacing) / 2
+            readonly property real fh: 140 * dp.s
             SlideFader {
-                width: parent.width; height: parent.fh; vertical: false
+                width: parent.fw; height: parent.fh; vertical: false
                 label: "STATIC"; note: "GRAIN + FLICKER"
                 value: bridge.crtStatic
                 onMoved: (v) => bridge.setCrtLevel("static", Math.round(v), false)
                 onCommitted: (v) => bridge.setCrtLevel("static", Math.round(v), true)
             }
             SlideFader {
-                width: parent.width; height: parent.fh; vertical: false
+                width: parent.fw; height: parent.fh; vertical: false
                 label: "SCREEN FX"; note: "SCANLINES + GLOW"
                 value: bridge.crtScreenFx
                 onMoved: (v) => bridge.setCrtLevel("screen_fx", Math.round(v), false)

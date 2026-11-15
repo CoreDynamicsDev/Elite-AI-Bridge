@@ -1,6 +1,8 @@
-"""Makes the holiday easter egg sounds (all synthesized here, no samples):
-gobble.wav (turkey), pop.wav (present), secret.wav (hidden pack found), and one click
-sound per holiday: noisemaker, harp, coins, chirp, gong, spooky, knock, jingle.
+"""Makes the holiday easter egg sounds (synthesized here, no samples):
+pop.wav (present), secret.wav (hidden pack found), and one click sound per holiday:
+noisemaker, harp, coins, chirp, gong, spooky, knock, jingle.
+gobble.wav (turkey) is NOT made here: it is a real turkey recording (public domain,
+"Turkey Gobble" by bod, SoundBible.com), trimmed and levelled. This script leaves it alone.
 Run again after changing a sound: python make_decor_sounds.py"""
 import math, random, wave, array
 from pathlib import Path
@@ -19,26 +21,6 @@ def write(name, samples):
 
 def env(t, a, d):
     return min(1.0, t / a) * math.exp(-t / d) if t >= 0 else 0.0
-
-
-# gobble: a run of throaty warbles that fall in pitch, like "gobble-obble-obble"
-def gobble():
-    out = [0.0] * int(SR * 0.95)
-    random.seed(3)
-    starts = [0.00, 0.11, 0.21, 0.31, 0.40, 0.49, 0.58, 0.66]
-    for k, t0 in enumerate(starts):
-        f0 = 620 - k * 38
-        n0 = int(t0 * SR); ph = 0.0
-        for i in range(int(0.12 * SR)):
-            t = i / SR
-            f = f0 * (1 + 0.18 * math.sin(2 * math.pi * 38 * t)) * (1 - 0.35 * t / 0.12)
-            ph += 2 * math.pi * f / SR
-            v = (math.sin(ph) + 0.55 * math.sin(2 * ph + 0.4) + 0.35 * math.sin(3 * ph) + 0.18 * math.sin(5 * ph))
-            v = math.tanh(1.8 * v) + 0.05 * (random.random() - 0.5)
-            a = env(t, 0.008, 0.045) * (1 - 0.06 * k)
-            if n0 + i < len(out):
-                out[n0 + i] += v * a
-    return out
 
 
 # pop: a soft cork pop and a little two-note chime
@@ -74,7 +56,6 @@ def secret():
     return out
 
 
-write("gobble.wav", gobble())
 write("pop.wav", pop())
 write("secret.wav", secret())
 

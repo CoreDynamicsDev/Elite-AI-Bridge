@@ -9671,7 +9671,8 @@ class HeadlessBridgeApp(legacy.BridgeApp):
     # ---- Trade search filters (2026-11-01, tester request) ---------------------
     # Trade page PAD (SHIP / L / M / ANY) and STATIONS (ALL / SPACE). .95 always kept only
     # stations whose pads fit the ship you're flying and only ranked planetary ports lower.
-    # Every route search (best trade, commodity routes, colony supply) goes through this.
+    # Every route search (best trade, commodity routes, colony loops) and the Colonization
+    # WHERE TO BUY list go through this.
     def _qml_trade_filters(self):
         host = getattr(self, "_qml_host", None)
         ov = dict(getattr(host, "setup_overrides", {}) or {}) if host is not None else {}
@@ -12521,6 +12522,12 @@ class BridgeHost:
                 rows = app.market_search_engine.search(
                     system, commodity, "BUY", 1, self.COLONY_SUPPLY_MAX_LY, 14, True,
                     local_market=local_market, origin_coords=getattr(app.state_data, "system_pos", None))
+                # Trade page LANDING PAD and STATIONS filters apply here too (2026-11-05)
+                hidden = 0
+                try:
+                    rows, hidden = app._filter_rows_ship_compatible_explicit(list(rows or []), True)
+                except Exception:
+                    hidden = 0
                 rows = sorted(rows or [], key=lambda r: float(r.get("distance_ly") if r.get("distance_ly") is not None else 1e9))
                 for r in rows[:30]:
                     age_s = legacy.market_age_seconds(r.get("updated_at"))
@@ -12537,8 +12544,9 @@ class BridgeHost:
                         "ageHours": -1.0 if age_s is None else round(float(age_s) / 3600.0, 2),
                     })
                 self.colony_supply_rows = rows_out
-                self.colony_supply_status = (f"{len(rows_out)} STATIONS SELL {commodity.upper()} // NEAREST FIRST // YOU NEED {int(need):,} T"
-                                             if rows_out else f"NO STATIONS FOUND SELLING {commodity.upper()} WITHIN {self.COLONY_SUPPLY_MAX_LY} LY")
+                hid = f" // {hidden} HIDDEN BY TRADE FILTERS" if hidden else ""
+                self.colony_supply_status = (f"{len(rows_out)} STATIONS SELL {commodity.upper()} // NEAREST FIRST // YOU NEED {int(need):,} T{hid}"
+                                             if rows_out else f"NO STATIONS FOUND SELLING {commodity.upper()} WITHIN {self.COLONY_SUPPLY_MAX_LY} LY{hid}")
             except Exception as exc:
                 self.colony_supply_rows = []
                 self.colony_supply_status = f"SUPPLY SEARCH FAILED // {str(exc)[:120].upper()}"
@@ -14368,6 +14376,14 @@ class BridgeHost:
                             cmd_log = Path(getattr(legacy, "BRIDGE_DATA_DIR")) / "logs" / name
                             if cmd_log.exists():
                                 zf.write(cmd_log, arcname=f"logs/{name}")
+                        # LAB v77: the first-time setup log (runtime, components, voice download), so a
+                        # setup problem that was later fixed by Repair still shows up in the zip.
+                        try:
+                            setup_log = log_root / "logs" / "runtime_setup.log"
+                            if setup_log.exists():
+                                zf.write(setup_log, arcname="logs/runtime_setup.log")
+                        except Exception:
+                            pass
                         demo_log = self.app._demo_transcript_path()
                         if demo_log.exists():
                             zf.write(demo_log, arcname="logs/demo_narration_transcript.log")

@@ -16,6 +16,9 @@ on to you. Elite AI Bridge is not affiliated with Supertone Inc.
 The interface uses the fonts DSEG7 Classic, Oswald, Saira Stencil One, Share Tech Mono and
 VT323 under the SIL Open Font License (see frontend/qml/skin/fonts/FONTS_LICENSE.txt and OFL.txt).
 
+The holiday turkey sound (frontend/sounds/gobble.wav) is "Turkey Gobble" by bod from
+SoundBible.com, released into the public domain, trimmed and levelled for the Bridge.
+
 Trade, market, supply and bounty hunting data come from community services: EDDN, EDData,
 Ardent Insight, EDSM and INTRA (Imperial Navy Intervention and Rescue). They are
 independent projects and are not affiliated with Elite AI Bridge.

@@ -414,13 +414,13 @@ Item {
                 id: mailKey
                 readonly property string email: "coredynamicsdev@gmail.com"
                 width: deck.keyW; height: deck.keyH
-                title: "EMAIL IT"; legend: "NO GITHUB? USE EMAIL"
-                tooltip: "OPENS YOUR EMAIL APP"; tooltipDetail: "TO " + email.toUpperCase() + " // ATTACH THE SUPPORT ZIP"
-                onActivated: { Qt.openUrlExternally("mailto:" + email + "?subject=" + encodeURIComponent("Elite AI Bridge bug report")); st.notice("OPENING EMAIL", "TO " + email.toUpperCase() + " // ATTACH THE SUPPORT ZIP", "info") }
+                title: "EMAIL US"; legend: "BUGS // IDEAS // TESTING"
+                tooltip: "OPENS YOUR EMAIL APP, TO " + email.toUpperCase(); tooltipDetail: "FOR A BUG, ATTACH THE SUPPORT ZIP // WANT TO BE A TEST PILOT? SAY SO: TEST PILOTS GET FUTURE SUPPORTER EXTRAS FREE"
+                onActivated: { Qt.openUrlExternally("mailto:" + email + "?subject=" + encodeURIComponent("Elite AI Bridge")); st.notice("OPENING EMAIL", "TO " + email.toUpperCase() + " // BUGS, IDEAS, OR TO BE A TEST PILOT", "info") }
             }
         }
         Caption { x: dRow.x + wizKey.x + (tourKey.x + tourKey.width - wizKey.x) / 2 - width / 2; y: deck.keyY - height - 6 * st.s; text: "GUIDES" }
-        Caption { x: dRow.x + helpKey.x + (mailKey.x + mailKey.width - helpKey.x) / 2 - width / 2; y: deck.keyY - height - 6 * st.s; text: "FOUND A BUG? REPORT IT" }
+        Caption { x: dRow.x + helpKey.x + (mailKey.x + mailKey.width - helpKey.x) / 2 - width / 2; y: deck.keyY - height - 6 * st.s; text: "BUG, IDEA OR WANT TO TEST? TELL US" }
         Item {
             x: deck.width - deck.cancelW - 40 * st.s; y: deck.keyY; width: deck.cancelW; height: deck.keyH
             DeckKey {

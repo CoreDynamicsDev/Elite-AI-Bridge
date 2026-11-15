@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.7 - 2026-11-15
+
+### Fixed
+- First-time setup picks Python 3.12, then 3.13, for the private runtime; never 3.14 or newer
+  (pygame 2.6.1 has no 3.14 build, so setup failed). Only 3.14 present: setup installs 3.12.
+- Trade > MY RUN EARNINGS counters have 10 drums (up to 9,999,999,999 CR); 8 cut off big trips.
+- Colonization WHERE TO BUY now uses the Trade LANDING PAD and STATIONS filters and counts what
+  it hid (listed for 2.0.6 but missing from that build).
+
+### Changed
+- Setup > Status: EMAIL US key (bugs, ideas, test pilots); setup wizard last screen email line.
+- MAKE SUPPORT FILE includes logs/runtime_setup.log.
+- Turkey gobble is a real public domain recording ("Turkey Gobble" by bod, SoundBible.com);
+  make_decor_sounds.py no longer generates it.
+- EMERALD screen colour is a deeper green. Setup > Display STATIC and SCREEN FX sliders side by side.
+
 ## 2.0.6 - 2026-11-06
 
 ### New

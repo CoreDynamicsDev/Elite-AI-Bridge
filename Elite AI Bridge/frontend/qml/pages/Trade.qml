@@ -679,7 +679,9 @@ Item {
             screwSize: 13 * tr.s
             Dymo { x: 26 * tr.s; y: 14 * tr.s; text: "EARNINGS" }
             readonly property real lab: Math.max(8, 13 * tr.s)
-            readonly property real cellW: Math.min(52 * tr.s, (width - 120 * tr.s) / 8.6, (height * 0.56 - 120 * tr.s) / 2.6)
+            // 10 drums: up to 9,999,999,999 CR (8 drums cut off big trips over 99,999,999; GitHub issue #1)
+            readonly property int drums: 10
+            readonly property real cellW: Math.min(52 * tr.s, (width - 120 * tr.s) / (drums + 0.6), (height * 0.56 - 120 * tr.s) / 2.6)
             Column {
                 id: earnCol
                 x: 26 * tr.s; y: 58 * tr.s
@@ -687,14 +689,14 @@ Item {
                 Text { text: "MADE THIS TRIP  //  " + tr.up(bridge.tradeTripSince); color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: earnPanel.lab; font.letterSpacing: 2 * tr.s }
                 Row {
                     spacing: 8 * tr.s
-                    Odometer { value: bridge.tradeTripProfit; digits: 8; cellW: earnPanel.cellW }
+                    Odometer { value: bridge.tradeTripProfit; digits: earnPanel.drums; cellW: earnPanel.cellW }
                     Text { anchors.verticalCenter: parent.verticalCenter; text: "CR"; color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: earnPanel.cellW * 0.42 }
                 }
                 readonly property bool est: tr.runActive && tr.target > 0
                 Text { text: earnCol.est ? "STILL TO EARN (EST.)" : "THIS TRIP"; color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: earnPanel.lab; font.letterSpacing: 2 * tr.s }
                 Row {
                     spacing: 8 * tr.s
-                    Odometer { visible: earnCol.est; value: bridge.tradeEstimatedRemainingProfit; digits: 8; cellW: earnPanel.cellW }
+                    Odometer { visible: earnCol.est; value: bridge.tradeEstimatedRemainingProfit; digits: earnPanel.drums; cellW: earnPanel.cellW }
                     Text { visible: earnCol.est; anchors.verticalCenter: parent.verticalCenter; text: "CR"; color: Theme.plateText; font.family: Theme.labelFont; font.pixelSize: earnPanel.cellW * 0.42 }
                     Text { visible: !earnCol.est; height: earnPanel.cellW * 1.3; verticalAlignment: Text.AlignVCenter
                            text: bridge.tradeTripSales + (bridge.tradeTripSales === 1 ? " SALE" : " SALES") + "  //  " + tr.num(bridge.tradeTripTons) + " T SOLD  //  " + tr.tripCycles + (tr.tripCycles === 1 ? " CYCLE" : " CYCLES")

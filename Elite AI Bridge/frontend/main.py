@@ -118,7 +118,7 @@ LIVE_COMMANDS = {
     "trade_route_search", "trade_route_use_index", "trade_best_search", "trade_best_use_index", "trade_learn_recent",
     "station_refuel", "station_repair", "station_rearm",
 }
-APP_VERSION = "2.0.6"
+APP_VERSION = "2.0.7"
 # 2.0.1 update notice: the Bridge only asks GitHub which release is newest and shows it.
 # It never downloads or runs anything; DOWNLOAD opens the release page in the browser.
 UPDATE_API_URL = "https://api.github.com/repos/CoreDynamicsDev/Elite-AI-Bridge-Download/releases/latest"

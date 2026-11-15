@@ -682,6 +682,17 @@ Item {
             k: Math.max(0.5, 1.0 * wz.s)
             animate: wz.visible
         }
+        // READY screen only: how to reach us (opens their email app)
+        Text {
+            visible: !!wz.screen.split
+            anchors.left: parent.left; anchors.leftMargin: 36 * wz.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 22 * wz.s
+            text: "QUESTIONS, IDEAS, OR WANT TO HELP TEST THE BRIDGE? <font color='#ffcf6e'>EMAIL US</font>"
+            textFormat: Text.StyledText
+            color: Theme.plateText; opacity: mailArea.containsMouse ? 1 : 0.7
+            font.family: Theme.labelFont; font.weight: Font.DemiBold; font.pixelSize: 15 * wz.s; font.letterSpacing: 3 * wz.s
+            PressArea { id: mailArea; anchors.fill: parent; anchors.margins: -10 * wz.s
+                        onActivated: Qt.openUrlExternally("mailto:coredynamicsdev@gmail.com?subject=" + encodeURIComponent("Elite AI Bridge")) }
+        }
         // corner: leave setup
         Text {
             anchors.right: parent.right; anchors.rightMargin: 36 * wz.s; anchors.bottom: parent.bottom; anchors.bottomMargin: 22 * wz.s
